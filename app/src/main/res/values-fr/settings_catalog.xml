@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_sort_direction">Sens du tri</string>
+    <string name="settings_quick_controls">Paramètres de base</string>
+    <string name="settings_group_app">Gestion de l’application</string>
+    <string name="settings_section_privacy">Confidentialité et autorisations</string>
+    <string name="settings_section_viewer">Commandes de la visionneuse</string>
+    <string name="settings_section_cache">Cache</string>
+    <string name="settings_section_backup">Sauvegarde des paramètres</string>
+    <string name="cloudipix_back">Retour</string>
+    <string name="settings_page_advanced">Paramètres avancés</string>
+    <string name="settings_page_advanced_hint">Affichage des dossiers, commandes du lecteur, confidentialité et sauvegarde</string>
+    <string name="setting_settings_theme">Thème des paramètres</string>
+    <string name="settings_theme_follow_gallery">Suivre le thème de la galerie</string>
+</resources>

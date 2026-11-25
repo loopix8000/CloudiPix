@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="all_files_access_title">모든 파일 접근 허용</string>
+    <string name="all_files_access_hint">Download 폴더를 포함한 기기 폴더를 옮기거나 동기화하려면 모든 파일 접근 권한이 필요합니다.</string>
+    <string name="all_files_access_denied">모든 파일 접근이 허용되지 않아 아무것도 바꾸지 않았습니다.</string>
+    <string name="folder_browser_select">이 폴더 선택</string>
+    <string name="folder_browser_up">상위 폴더로</string>
+    <string name="folder_browser_empty">하위 폴더가 없습니다</string>
+    <string name="folder_browser_create_failed">폴더를 만들 수 없습니다</string>
+    <string name="sync_restore_all_files">모든 파일 접근을 허용하면 %1$s 동기화를 복원합니다.</string>
+    <string name="folder_browser_read_failed">폴더를 열 수 없습니다</string>
+</resources>

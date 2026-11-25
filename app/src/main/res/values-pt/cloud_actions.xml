@@ -1,0 +1,10 @@
+<resources>
+    <string name="cloud_device">Este dispositivo</string>
+    <string name="cloud_local_folder_path">Este dispositivo · %1$s</string>
+    <string name="cloud_file_error">Não foi possível concluir a ação. Verifique a ligação, as permissões da pasta e o nome do ficheiro.</string>
+    <string name="cloud_trash_confirm">Mover %1$d itens selecionados para o lixo?</string>
+    <string name="cloud_delete_confirm">Eliminar definitivamente %1$d itens selecionados?</string>
+    <string name="cloud_original_kept">Cópias guardadas. Os originais que não autorizou a eliminar permanecem neste dispositivo.</string>
+    <string name="cloud_source_changed">Cópias guardadas. Os originais alterados durante a transferência permanecem neste dispositivo.</string>
+    <string name="cloud_working">A processar os ficheiros selecionados…</string>
+</resources>

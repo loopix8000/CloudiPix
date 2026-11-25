@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setting_confirm_trash">Vor dem Verschieben in den Papierkorb bestätigen</string>
+    <string name="setting_confirm_trash_hint">Wenn deaktiviert, entfällt die Bestätigung in der Galerie. Android kann bei Dateien auf dem Gerät weiterhin nachfragen.</string>
+    <string name="media_management_title">Berechtigungen verwalten</string>
+    <string name="media_management_hint">Zugriff auf Fotos und Videos verwalten.</string>
+    <string name="media_management_open_settings">Einstellungen öffnen</string>
+    <string name="media_management_later">Später</string>
+    <string name="media_management_unavailable">Die Medienverwaltung ist auf diesem Gerät nicht verfügbar.</string>
+</resources>

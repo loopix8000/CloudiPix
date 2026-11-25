@@ -1,0 +1,402 @@
+<resources>
+    <string name="tab_move">Перемістити до вкладки</string>
+    <string name="tabs_manage">Керування вкладками</string>
+    <string name="tab_add">Додати вкладку</string>
+    <string name="tab_edit">Редагувати вкладку</string>
+    <string name="tab_delete">Видалити вкладку</string>
+    <string name="tab_delete_named">Видалити вкладку %1$s</string>
+    <string name="tab_move_up_named">Перемістити вкладку %1$s вгору</string>
+    <string name="tab_move_down_named">Перемістити вкладку %1$s вниз</string>
+    <string name="tab_delete_prompt">Видалити «%1$s»? Альбоми й фотографії залишаться.</string>
+    <string name="tab_name">Назва вкладки</string>
+    <string name="tab_name_taken">Вкладка з такою назвою вже існує.</string>
+    <string name="tab_empty">Немає альбомів для показу.</string>
+    <string name="app_name">Галерея</string>
+
+    <!-- Панель і вибір -->
+    <string name="action_search">Пошук</string>
+    <string name="action_more">Більше дій</string>
+    <string name="action_ignore">Ігнорувати</string>
+    <string name="action_unhide_folder">Знову показати</string>
+    <string name="folder_unhide_failed">Не вдалося знову показати вибрані теки.</string>
+    <string name="action_pin">Закріпити</string>
+    <string name="action_unpin">Відкріпити</string>
+    <string name="pinned">Закріплено</string>
+    <string name="action_delete">Видалити</string>
+    <string name="action_share">Поділитися</string>
+    <string name="action_favorite">Обране</string>
+    <string name="action_remove_favorite">Вилучити з обраного</string>
+    <string name="action_select_all">Усе</string>
+    <string name="selection_count">Вибрано %1$d</string>
+    <string name="selection_hint_long_press">Утримуйте, щоб вибрати</string>
+    <string name="selection_hint_tap">Торкніться, щоб додати або прибрати</string>
+
+    <!-- Меню -->
+    <string name="menu_sort_by">Сортувати за</string>
+    <string name="menu_show">Показувати</string>
+    <string name="menu_columns">Стовпці</string>
+    <string name="menu_group_by">Групувати за</string>
+    <string name="menu_this_folder_only">Лише ця папка</string>
+    <string name="menu_ignore_folder">Ігнорувати теку</string>
+    <string name="menu_refresh">Оновити</string>
+    <string name="menu_settings">Налаштування</string>
+
+    <!-- Сітка медіа -->
+    <string name="media_summary">%1$s елем. · %2$s</string>
+
+    <!-- Пошук -->
+    <string name="search_placeholder">Пошук за назвою файлу</string>
+    <string name="search_no_matches">Нічого не знайдено</string>
+    <string name="search_results">Знайдено: %1$s</string>
+
+    <!-- Перегляд -->
+    <string name="details_title">ДЕТАЛІ</string>
+    <string name="details_size">Розмір</string>
+    <string name="details_dimensions">Роздільність</string>
+    <string name="details_camera">Камера</string>
+    <string name="details_exposure">Експозиція</string>
+    <string name="details_path">Шлях</string>
+    <string name="details_file_name">Назва файлу</string>
+
+    <!-- Дозволи -->
+    <string name="permission_title">Галереї потрібен доступ до ваших фото та відео</string>
+    <string name="permission_body">Дозвольте доступ до фото й відео на цьому пристрої.</string>
+    <string name="permission_open_settings">Відкрити налаштування</string>
+
+    <!-- Розділи налаштувань -->
+    <string name="settings_title">Налаштування</string>
+    <string name="section_language">Мова</string>
+    <string name="section_grid">Сітка</string>
+    <string name="section_folders">Теки</string>
+    <string name="section_video">Відео</string>
+    <string name="section_advanced">Додатково</string>
+
+    <!-- Рядки налаштувань -->
+    <string name="setting_gallery_theme">Тема галереї</string>
+    <string name="setting_accent">Акцент</string>
+    <string name="setting_contrast">Контраст тексту</string>
+    <string name="setting_corner_radius">Радіус кутів</string>
+    <string name="setting_font">Шрифт</string>
+    <string name="setting_interface_size">Розмір інтерфейсу</string>
+    <string name="setting_language">Мова застосунку</string>
+    <string name="setting_sort_all">Сортувати все за</string>
+    <string name="setting_folder_columns">Стовпців тек</string>
+    <string name="setting_media_columns">Стовпців медіа</string>
+    <string name="setting_group_media">Групувати медіа за</string>
+    <string name="setting_scroll_direction">Напрямок прокручування</string>
+    <string name="setting_overlay_ui">Панель поверх сітки</string>
+    <string name="setting_overlay_ui_hint">Медіа прокручується під назвою та кнопками, які лишаються на власних острівцях</string>
+    <string name="setting_folder_name">Показувати назви папок</string>
+    <string name="setting_folder_count">Показувати кількість елементів</string>
+    <string name="setting_folder_count_hint">Кількість фото й відео в кожній папці</string>
+    <string name="setting_folder_size">Показувати розмір папки</string>
+    <string name="setting_folder_size_hint">Загальний розмір файлів у кожній папці</string>
+    <string name="setting_cloud_folder_icons">Показувати значки хмарних папок і папок синхронізації</string>
+    <string name="setting_cloud_folder_icons_only_while_syncing">Показувати значки лише під час синхронізації</string>
+    <string name="setting_details_position">Розташування підпису</string>
+    <string name="setting_ignored">Ігноровані теки</string>
+    <string name="menu_show_ignored_folders">Показати приховані теки</string>
+    <string name="menu_hide_ignored_folders">Знову приховати теки</string>
+    <string name="setting_ignored_hint">Теки, приховані з галереї</string>
+    <string name="setting_preview_spacing">Відступ між мініатюрами</string>
+    <string name="setting_crop">Обрізати у квадрат</string>
+    <string name="setting_crop_hint">Інакше зберігати вихідні пропорції</string>
+    <string name="setting_video_duration">Показувати тривалість відео</string>
+    <string name="setting_video_duration_hint">Показує тривалість на мініатюрах відео</string>
+    <string name="setting_autoplay">Автовідтворення наступного відео</string>
+    <string name="setting_autoplay_hint">Коли одне завершується, відтворити наступне відео в теці. Вимкнено — повторювати поточне.</string>
+    <string name="setting_background_playback">Відтворювати у згорнутому застосунку</string>
+    <string name="setting_background_playback_hint">Відео продовжує грати, коли застосунок згорнуто; керування — зі сповіщення.</string>
+
+    <!-- Попередній перегляд тек -->
+
+    <!-- Ігноровані теки -->
+    <string name="ignored_title">Ігноровані теки</string>
+    <string name="ignored_hint">Ігнорується: %1$d · позначте теку, щоб приховати її з галереї</string>
+
+    <!-- Режим теми -->
+    <string name="mode_auto">Авто</string>
+    <string name="mode_light">Світла</string>
+    <string name="mode_dark">Темна</string>
+    <string name="mode_black">Чорна</string>
+
+    <!-- Контраст -->
+    <string name="contrast_soft">М’який</string>
+    <string name="contrast_normal">Звичайний</string>
+    <string name="contrast_high">Високий</string>
+
+    <!-- Сортування -->
+    <string name="sort_date_taken">Датою зйомки</string>
+    <string name="sort_modified">Датою зміни</string>
+    <string name="sort_name">Назвою</string>
+    <string name="sort_size">Розміром</string>
+    <string name="sort_type">Типом вмісту</string>
+    <string name="sort_favorite_added">Порядком додавання до обраного</string>
+
+    <!-- Групування -->
+    <string name="group_today">Сьогодні</string>
+    <string name="group_yesterday">Учора</string>
+    <string name="group_none">Без груп</string>
+    <string name="group_day">Днем</string>
+    <string name="group_month">Місяцем</string>
+    <string name="group_year">Роком</string>
+
+    <!-- Фільтр медіа -->
+    <string name="filter_all">Усі медіа</string>
+    <string name="filter_images">Зображення</string>
+    <string name="filter_videos">Відео</string>
+
+    <!-- Відступи -->
+    <string name="spacing_none">Немає</string>
+    <string name="spacing_small">Малий</string>
+    <string name="spacing_large">Великий</string>
+
+    <!-- Напрямок прокручування -->
+    <string name="scroll_down">Униз</string>
+    <string name="scroll_up">Угору</string>
+
+    <!-- Розташування підпису -->
+    <string name="placement_below">Знизу</string>
+    <string name="placement_overlay">На зображенні</string>
+
+    <!-- Вписування відео -->
+    <string name="fit_fit">Вписати</string>
+    <string name="fit_fill">Заповнити</string>
+    <string name="fit_stretch">Розтягнути</string>
+
+    <!-- Кольори іконки -->
+
+    <!-- Вибір, що слідує за системою -->
+    <string name="follow_system">Системна</string>
+
+    <!-- Редактор -->
+    <string name="editor_crop">Обрізати</string>
+    <string name="editor_adjust">Корекція</string>
+    <string name="editor_brightness">Яскравість</string>
+    <string name="editor_contrast">Контраст</string>
+    <string name="editor_saturation">Насиченість</string>
+    <string name="editor_saved">Збережено як копію</string>
+    <string name="action_save">Зберегти</string>
+    <string name="action_reset">Скинути</string>
+    <string name="action_close">Закрити</string>
+    <string name="action_rotate_left">Повернути ліворуч</string>
+    <string name="action_rotate_right">Повернути праворуч</string>
+    <string name="action_mirror">Дзеркально</string>
+    <string name="crop_free">Вільно</string>
+    <string name="editor_exposure">Експозиція</string>
+    <string name="editor_highlights">Світлі тони</string>
+    <string name="editor_shadows">Тіні</string>
+    <string name="editor_whites">Білі</string>
+    <string name="editor_blacks">Чорні</string>
+    <string name="editor_vibrance">Соковитість</string>
+    <string name="editor_temperature">Температура</string>
+    <string name="editor_tint">Відтінок</string>
+    <string name="action_undo">Відмінити</string>
+    <string name="action_redo">Повторити</string>
+    <string name="action_edit">Редагувати</string>
+    <string name="action_panorama">Перегляд 360°</string>
+    <string name="action_cancel">Скасувати</string>
+    <string name="editor_reset_all">Скинути все</string>
+    <string name="crop_original">Оригінал</string>
+    <string name="editor_straighten">Вирівняти</string>
+    <string name="editor_perspective">Перспектива</string>
+    <string name="action_flip_vertical">Віддзеркалити вертикально</string>
+    <string name="perspective_hint">Перетягніть кути на лінії, які мають бути прямими</string>
+    <string name="action_done">Готово</string>
+    <string name="action_duplicate">Дублювати</string>
+    <string name="action_lock">Заблокувати</string>
+    <string name="action_unlock">Розблокувати</string>
+    <string name="blend_screen">Екран</string>
+    <string name="blend_overlay">Перекриття</string>
+    <string name="blend_multiply">Множення</string>
+    <string name="camera_digital">Цифрова</string>
+    <string name="camera_pocket">Кишенькова</string>
+    <string name="camera_zoom">Зум</string>
+    <string name="camera_instant">Миттєва</string>
+    <string name="camera_camcorder">Відеокамера</string>
+    <string name="camera_film">Плівка</string>
+    <string name="camera_glare">Відблиск</string>
+    <string name="camera_hint_pick">Оберіть камеру, щоб надати фото її вигляд</string>
+    <string name="camera_hint_settings">Торкніться вибраної камери, щоб налаштувати її</string>
+    <string name="date_off">Вимк.</string>
+    <string name="date_classic">Класична</string>
+    <string name="date_led">LED</string>
+    <string name="date_white">Біла</string>
+    <string name="date_ink">Чорнило</string>
+    <string name="draw_undo_stroke">Прибрати останній штрих</string>
+    <string name="editor_markup">Розмітка</string>
+    <string name="markup_pen">Ручка</string>
+    <string name="markup_pencil">Олівець</string>
+    <string name="markup_marker">Маркер</string>
+    <string name="markup_highlighter">Текстовиділювач</string>
+    <string name="markup_line">Лінія</string>
+    <string name="markup_arrow">Стрілка</string>
+    <string name="markup_rectangle">Прямокутник</string>
+    <string name="markup_ellipse">Еліпс</string>
+    <string name="markup_eraser">Гумка</string>
+    <string name="markup_clear">Очистити розмітку</string>
+    <string name="editor_presets">Пресети</string>
+    <string name="editor_cameras">Камери</string>
+    <string name="editor_effects">Ефекти</string>
+    <string name="editor_text">Текст</string>
+    <string name="editor_fade">Вицвітання</string>
+    <string name="editor_clarity">Чіткість</string>
+    <string name="editor_sharpen">Різкість</string>
+    <string name="editor_glow">Сяйво</string>
+    <string name="editor_grain">Зерно</string>
+    <string name="editor_vignette">Віньєтка</string>
+    <string name="editor_curves">Криві</string>
+    <string name="editor_hsl">HSL</string>
+    <string name="editor_split">Розділення</string>
+    <string name="editor_title_curves">Тонова крива</string>
+    <string name="editor_title_hsl">Змішування кольорів</string>
+    <string name="editor_title_split">Розділене тонування</string>
+    <string name="editor_hue">Тон</string>
+    <string name="editor_luminance">Яскравість</string>
+    <string name="editor_intensity">Інтенсивність</string>
+    <string name="editor_opacity">Непрозорість</string>
+    <string name="editor_save_changes">Зберегти зміни</string>
+    <string name="editor_discard_changes">Відкинути зміни</string>
+    <string name="editor_hold_to_compare">Утримуйте, щоб порівняти</string>
+    <string name="effect_leak">Засвітка</string>
+    <string name="effect_dust">Пил</string>
+    <string name="effect_scratches">Подряпини</string>
+    <string name="effect_burn">Опік</string>
+    <string name="effect_vhs">VHS</string>
+    <string name="effect_date">Дата</string>
+    <string name="hue_red">Червоний</string>
+    <string name="hue_orange">Помаранчевий</string>
+    <string name="hue_yellow">Жовтий</string>
+    <string name="hue_green">Зелений</string>
+    <string name="hue_aqua">Бірюзовий</string>
+    <string name="hue_blue">Синій</string>
+    <string name="hue_purple">Фіолетовий</string>
+    <string name="hue_magenta">Пурпуровий</string>
+    <string name="pack_all">Усі</string>
+    <string name="pack_natural">Природні</string>
+    <string name="pack_warm">Теплі</string>
+    <string name="pack_cool">Холодні</string>
+    <string name="pack_film">Плівка</string>
+    <string name="pack_mono">Моно</string>
+    <string name="preset_clear">Чистий</string>
+    <string name="preset_soft">М’який</string>
+    <string name="preset_vivid">Яскравий</string>
+    <string name="preset_matte">Матовий</string>
+    <string name="preset_golden">Золотий</string>
+    <string name="preset_amber">Бурштин</string>
+    <string name="preset_sunset">Захід</string>
+    <string name="preset_peach">Персик</string>
+    <string name="preset_ocean">Океан</string>
+    <string name="preset_frost">Іній</string>
+    <string name="preset_dusk">Сутінки</string>
+    <string name="preset_mint">М’ята</string>
+    <string name="preset_faded">Вицвілий</string>
+    <string name="preset_classic">Класика</string>
+    <string name="preset_retro">Ретро</string>
+    <string name="preset_chrome">Хром</string>
+    <string name="preset_mono">Моно</string>
+    <string name="preset_mono_soft">Моно м’який</string>
+    <string name="preset_mono_deep">Моно глибокий</string>
+    <string name="preset_silver">Срібло</string>
+    <string name="split_highlights_hue">Тон світлих</string>
+    <string name="split_highlights">Світлі тони</string>
+    <string name="split_shadows_hue">Тон тіней</string>
+    <string name="split_shadows">Тіні</string>
+    <string name="split_balance">Баланс</string>
+    <string name="stock_soft">М’яка</string>
+    <string name="stock_cool">Холодна</string>
+    <string name="stock_mono">Моно</string>
+    <string name="text_add">Додати текст</string>
+    <string name="text_align">Вирівнювання</string>
+    <string name="text_hint">Торкніться тексту на фото або додайте новий</string>
+    <string name="text_placeholder">Почніть вводити</string>
+    <string name="text_plate">Тло</string>
+    <string name="action_copy">Копіювати</string>
+    <string name="action_copy_to">Копіювати до</string>
+    <string name="action_move_to">Перемістити до</string>
+    <string name="action_move">Перемістити</string>
+    <string name="action_rename">Перейменувати</string>
+    <string name="action_copy_path">Копіювати шлях</string>
+    <string name="paths_copied">Шляхи скопійовано</string>
+    <string name="files_new_folder">Нова папка</string>
+    <string name="files_copy_failed">Деякі файли не вдалося скопіювати</string>
+    <string name="files_move_failed">Деякі файли не вдалося перемістити</string>
+    <string name="files_move_confirm">Перемістити вибрані елементи (%1$d) до %2$s?</string>
+    <string name="files_move_location_hint">Android також запитує доступ до даних про місце зйомки, збережених у фотографіях, щоб ви могли підтверджувати наступні переміщення тут.</string>
+    <string name="files_rename_failed">Не вдалося перейменувати файл</string>
+    <string name="folder_recent">Нещодавні</string>
+    <string name="folder_favorites">Обране</string>
+    <string name="favorites_empty">Поки що немає обраних елементів</string>
+    <string name="setting_show_recent">Показувати «Нещодавні»</string>
+    <string name="setting_show_recent_hint">Усі фото й відео, найновіші спершу, першою плиткою</string>
+    <string name="setting_viewer_scrim">Тло панелей перегляду</string>
+    <string name="setting_viewer_scrim_hint">Наскільки темні панелі над фото чи відео на весь екран. Праворуч — суцільний чорний.</string>
+    <string name="setting_volume_button_paging">Навігація кнопками гучності</string>
+    <string name="setting_volume_button_paging_hint">Кнопки гучності перемикають фото та прокручують списки.</string>
+    <string name="setting_panorama_all">360° для всіх медіа</string>
+    <string name="setting_panorama_all_hint">Кнопка 360° зʼявляється на кожному фото й відео. Файли без 360° метаданих відкриваються пласкими, а сферу вмикає кнопка.</string>
+    <string name="action_metadata">Метадані</string>
+    <string name="metadata_date">Дата</string>
+    <string name="metadata_time">Час</string>
+    <string name="metadata_description">Опис</string>
+    <string name="metadata_author">Автор</string>
+    <string name="metadata_location">Місце</string>
+    <string name="metadata_remove_location">Прибрати місце</string>
+    <string name="metadata_read_only">Змінювати можна лише фото JPEG, PNG і WebP</string>
+    <string name="metadata_save_failed">Не вдалося зберегти зміни</string>
+    <string name="details_lens">Об\'єктив</string>
+    <string name="details_focal_length">Фокусна відстань</string>
+    <string name="action_set_as">Встановити як</string>
+    <string name="section_actions">Панелі дій</string>
+    <string name="setting_selection_bar">Під час вибору</string>
+    <string name="setting_viewer_bar">Під час перегляду</string>
+    <string name="actions_hint">Перетягуйте, щоб змінити порядок. Торкніться дії, щоб перемістити її між панеллю та меню ⋮, зніміть галочку, щоб приховати.</string>
+    <string name="actions_in_menu">У меню</string>
+    <string name="setting_actions_hint">Оберіть, які дії стоять у нижній панелі, а які в меню ⋮</string>
+    <string name="actions_overflow_hint">Якщо в панелі забракне місця, останні дії самі перейдуть у ⋮ і повернуться, коли місце з’явиться. Нічого не губиться.</string>
+    <string name="settings_export">Експортувати налаштування</string>
+    <string name="settings_export_hint">Зберегти налаштування застосунку у файл JSON</string>
+    <string name="settings_export_saved">Файл налаштувань збережено.</string>
+    <string name="settings_export_failed">Не вдалося зберегти файл налаштувань.</string>
+    <string name="settings_import">Імпортувати налаштування</string>
+    <string name="settings_import_hint">Застосувати налаштування з експортованого файлу JSON</string>
+    <string name="settings_import_applied">Налаштування імпортовано</string>
+    <string name="settings_import_failed">Не вдалося імпортувати файл налаштувань.</string>
+    <string name="settings_import_sync_review">Перевірте підключення до серверів і доступ до папок у налаштуваннях синхронізації.</string>
+    <string name="settings_import_sync_access">Відновити доступ до папки синхронізації</string>
+    <string name="settings_import_sync_access_failed">Не вдалося відкрити папку. Виберіть папку, вказану вище.</string>
+    <string name="settings_import_cache_review">Перевірте обмеження розміру хмарного кешу.</string>
+    <string name="settings_import_lock_review">Перевірте блокування застосунку на цьому пристрої.</string>
+    <string name="setting_about">Про застосунок</string>
+    <string name="update_check">Перевірити оновлення</string>
+    <string name="update_checking">Перевірка оновлень…</string>
+    <string name="update_latest">Встановлено найновішу версію CloudiPix.</string>
+    <string name="update_available">Доступне оновлення</string>
+    <string name="update_available_version">CloudiPix %1$s доступний для завантаження.</string>
+    <string name="update_download">Завантажити</string>
+    <string name="update_downloading">Завантаження оновлення…</string>
+    <string name="update_verifying">Перевірка оновлення…</string>
+    <string name="update_install">Встановити оновлення</string>
+    <string name="update_open_download">Відкрийте Завантаження → CloudiPix у файловому менеджері й торкніться завантаженого APK, щоб установити оновлення.</string>
+    <string name="update_tap_apk">Торкніться %1$s, щоб установити оновлення.</string>
+    <string name="update_source_missing">Для цієї збірки не налаштовано репозиторій оновлень.</string>
+    <string name="update_release_missing">У репозиторії оновлень немає опублікованого випуску.</string>
+    <string name="update_version_invalid">Формат версії застосунку або випуску не підтримується.</string>
+    <string name="update_apk_missing">У випуску не знайдено APK для встановлення.</string>
+    <string name="update_apk_incompatible">APK недійсний або несумісний із поточною версією CloudiPix.</string>
+    <string name="update_check_failed">Не вдалося перевірити оновлення. Спробуйте ще раз.</string>
+    <string name="update_download_failed">Не вдалося завантажити оновлення. Спробуйте ще раз.</string>
+    <string name="setting_about_hint">Версія, ліцензія та відомості про відкритий код</string>
+    <string name="about_tagline">Фото з телефона й NAS в одному місці.</string>
+    <string name="about_version">Версія</string>
+    <string name="about_info">Підключіть сервер WebDAV або FTP, щоб керувати хмарними альбомами й переносити фотографії між папками. Застосунок не показує рекламу й не збирає дані використання або звіти про збої.</string>
+    <string name="about_license">Ліцензія</string>
+    <string name="about_section_app">Про застосунок</string>
+    <string name="about_section_credits">Відкритий код</string>
+    <string name="trash_title">Кошик</string>
+    <string name="trash_empty">Кошик порожній</string>
+    <string name="action_restore">Відновити</string>
+    <string name="action_delete_forever">Видалити назавжди</string>
+    <string name="editor_saved_to_pictures">Збережено в папку Pictures</string>
+    <string name="editor_save_failed">Не вдалося зберегти фото</string>
+</resources>

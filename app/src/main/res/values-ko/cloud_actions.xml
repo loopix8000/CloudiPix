@@ -1,0 +1,10 @@
+<resources>
+    <string name="cloud_device">이 기기</string>
+    <string name="cloud_local_folder_path">이 기기 · %1$s</string>
+    <string name="cloud_file_error">작업을 완료할 수 없습니다. 연결 상태, 폴더 쓰기 권한과 파일 이름을 확인하세요.</string>
+    <string name="cloud_trash_confirm">선택한 항목 %1$d개를 휴지통으로 옮길까요?</string>
+    <string name="cloud_delete_confirm">선택한 항목 %1$d개를 영구 삭제할까요?</string>
+    <string name="cloud_original_kept">클라우드에 저장했습니다. 삭제를 승인하지 않은 원본은 기기에 남아 있습니다.</string>
+    <string name="cloud_source_changed">클라우드에 저장했습니다. 전송 중 변경된 원본은 기기에 남아 있습니다.</string>
+    <string name="cloud_working">선택한 파일을 처리하고 있습니다…</string>
+</resources>

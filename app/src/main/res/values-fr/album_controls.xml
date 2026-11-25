@@ -1,0 +1,8 @@
+<resources>
+    <string name="album_rename">Renommer le dossier</string>
+    <string name="album_rename_failed">Impossible de renommer le dossier.</string>
+    <string name="album_rename_done">Dossier renommé en %1$s.</string>
+    <string name="album_move">Déplacer le dossier</string>
+    <string name="album_move_failed">Impossible de déplacer le dossier. Choisissez un autre dossier sur le même espace de stockage.</string>
+    <string name="album_move_done">Dossier %1$s déplacé.</string>
+</resources>

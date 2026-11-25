@@ -1,0 +1,10 @@
+<resources>
+    <string name="cloud_device">Cet appareil</string>
+    <string name="cloud_local_folder_path">Cet appareil · %1$s</string>
+    <string name="cloud_file_error">Impossible de terminer l’action. Vérifiez la connexion, les autorisations du dossier et le nom du fichier.</string>
+    <string name="cloud_trash_confirm">Mettre les %1$d éléments sélectionnés à la corbeille ?</string>
+    <string name="cloud_delete_confirm">Supprimer définitivement les %1$d éléments sélectionnés ?</string>
+    <string name="cloud_original_kept">Copies enregistrées. Les originaux dont vous avez refusé la suppression restent sur cet appareil.</string>
+    <string name="cloud_source_changed">Copies enregistrées. Les originaux modifiés pendant le transfert restent sur cet appareil.</string>
+    <string name="cloud_working">Traitement des fichiers sélectionnés…</string>
+</resources>

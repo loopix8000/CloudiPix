@@ -1,0 +1,8 @@
+<resources>
+    <string name="album_rename">Cambiar nombre de carpeta</string>
+    <string name="album_rename_failed">No se pudo cambiar el nombre de la carpeta.</string>
+    <string name="album_rename_done">Nombre de carpeta cambiado a %1$s.</string>
+    <string name="album_move">Mover carpeta</string>
+    <string name="album_move_failed">No se pudo mover la carpeta. Elige otra carpeta en el mismo almacenamiento.</string>
+    <string name="album_move_done">Se movió la carpeta %1$s.</string>
+</resources>

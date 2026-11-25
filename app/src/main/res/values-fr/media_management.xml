@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setting_confirm_trash">Confirmer avant la mise à la corbeille</string>
+    <string name="setting_confirm_trash_hint">Désactivez cette option pour ne plus recevoir la confirmation de la galerie. Android peut encore demander une autorisation pour les fichiers de l’appareil.</string>
+    <string name="media_management_title">Gérer les autorisations</string>
+    <string name="media_management_hint">Gérez l’accès aux photos et aux vidéos.</string>
+    <string name="media_management_open_settings">Ouvrir les paramètres</string>
+    <string name="media_management_later">Plus tard</string>
+    <string name="media_management_unavailable">Les paramètres de gestion des médias ne sont pas disponibles sur cet appareil.</string>
+</resources>

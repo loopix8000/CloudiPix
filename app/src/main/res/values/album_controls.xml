@@ -1,0 +1,16 @@
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="album_options">Folder options</string>
+    <string name="album_choose_cover">Choose cover photo</string>
+    <string name="album_automatic_cover">Use automatic cover</string>
+    <string name="album_cover_hint">Tap a photo to use it as the folder cover</string>
+    <string name="album_cover_empty">This folder has no photos to use as a cover.</string>
+    <string name="folder_sort_manual">Manual order</string>
+    <string name="sort_ascending">Ascending</string>
+    <string name="sort_descending">Descending</string>
+    <string name="album_rename">Rename folder</string>
+    <string name="album_rename_failed">Couldn\'t rename the folder</string>
+    <string name="album_rename_done">Folder renamed to %1$s</string>
+    <string name="album_move">Move folder</string>
+    <string name="album_move_failed">Couldn\'t move the folder. Choose another folder on the same storage volume.</string>
+    <string name="album_move_done">Moved folder %1$s</string>
+</resources>

@@ -1,0 +1,19 @@
+<resources>
+    <string name="setting_app_lock">앱 잠금</string>
+    <string name="setting_app_lock_hint">갤러리를 다시 열 때 기기 인증으로 잠금을 해제합니다</string>
+    <string name="setting_hide_recents_preview">최근 앱 미리보기 숨기기</string>
+    <string name="setting_hide_recents_preview_legacy_hint">이 Android 버전에서는 스크린샷도 차단됩니다</string>
+    <string name="enable_folder_lock">폴더 잠금</string>
+    <string name="remove_folder_lock">폴더 잠금 해제</string>
+    <string name="change_app_lock">앱 잠금 설정 변경</string>
+    <string name="change_folder_lock">폴더 잠금 설정 변경</string>
+    <string name="app_locked">갤러리가 잠겨 있습니다</string>
+    <string name="folder_locked">잠긴 폴더</string>
+    <string name="photo_auth_required">사진을 열려면 인증이 필요합니다</string>
+    <string name="unlock_app">갤러리 잠금 해제</string>
+    <string name="unlock_folder">잠긴 폴더 열기</string>
+    <string name="lock_authenticate">인증하기</string>
+    <string name="lock_back">돌아가기</string>
+    <string name="device_lock_required">이 기능을 사용하려면 Android 설정에서 화면 잠금을 설정하세요.</string>
+    <string name="open_device_security">기기 보안 설정 열기</string>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="all_files_access_title">Autoriser l’accès à tous les fichiers</string>
+    <string name="all_files_access_hint">Pour déplacer et synchroniser des dossiers de l’appareil, y compris le dossier Download, l’accès à tous les fichiers est nécessaire.</string>
+    <string name="all_files_access_denied">L’accès à tous les fichiers n’a pas été autorisé, rien n’a été modifié.</string>
+    <string name="folder_browser_select">Utiliser ce dossier</string>
+    <string name="folder_browser_up">Niveau supérieur</string>
+    <string name="folder_browser_empty">Aucun dossier ici</string>
+    <string name="folder_browser_create_failed">Impossible de créer le dossier</string>
+    <string name="sync_restore_all_files">Autorisez l’accès à tous les fichiers pour restaurer la synchronisation de %1$s.</string>
+    <string name="folder_browser_read_failed">Impossible d’ouvrir ce dossier</string>
+</resources>

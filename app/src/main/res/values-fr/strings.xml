@@ -1,0 +1,402 @@
+<resources>
+    <string name="tab_move">Déplacer vers un onglet</string>
+    <string name="tabs_manage">Gérer les onglets</string>
+    <string name="tab_add">Ajouter un onglet</string>
+    <string name="tab_edit">Modifier l’onglet</string>
+    <string name="tab_delete">Supprimer l’onglet</string>
+    <string name="tab_delete_named">Supprimer l’onglet %1$s</string>
+    <string name="tab_move_up_named">Monter l’onglet %1$s</string>
+    <string name="tab_move_down_named">Descendre l’onglet %1$s</string>
+    <string name="tab_delete_prompt">Supprimer « %1$s » ? Les albums et les photos seront conservés.</string>
+    <string name="tab_name">Nom de l’onglet</string>
+    <string name="tab_name_taken">Ce nom d’onglet est déjà utilisé.</string>
+    <string name="tab_empty">Aucun album à afficher.</string>
+    <string name="app_name">Galerie</string>
+
+    <!-- Toolbar and selection -->
+    <string name="action_search">Rechercher</string>
+    <string name="action_more">Plus d’options</string>
+    <string name="action_ignore">Ignorer</string>
+    <string name="action_unhide_folder">Réafficher</string>
+    <string name="folder_unhide_failed">Impossible de réafficher les dossiers sélectionnés.</string>
+    <string name="action_pin">Épingler</string>
+    <string name="action_unpin">Désépingler</string>
+    <string name="pinned">Épinglé</string>
+    <string name="action_delete">Supprimer</string>
+    <string name="action_share">Partager</string>
+    <string name="action_favorite">Favori</string>
+    <string name="action_remove_favorite">Retirer des favoris</string>
+    <string name="action_select_all">Tout</string>
+    <string name="selection_count">%1$d sélectionnés</string>
+    <string name="selection_hint_long_press">Appui long pour sélectionner</string>
+    <string name="selection_hint_tap">Touchez pour ajouter ou retirer</string>
+
+    <!-- Menus -->
+    <string name="menu_sort_by">Trier par</string>
+    <string name="menu_show">Afficher</string>
+    <string name="menu_columns">Colonnes</string>
+    <string name="menu_group_by">Grouper par</string>
+    <string name="menu_this_folder_only">Ce dossier uniquement</string>
+    <string name="menu_ignore_folder">Ignorer le dossier</string>
+    <string name="menu_refresh">Actualiser</string>
+    <string name="menu_settings">Paramètres</string>
+
+    <!-- Media grid -->
+    <string name="media_summary">%1$s éléments · %2$s</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Rechercher par nom de fichier</string>
+    <string name="search_no_matches">Aucun résultat</string>
+    <string name="search_results">%1$s résultats</string>
+
+    <!-- Viewer -->
+    <string name="details_title">DÉTAILS</string>
+    <string name="details_size">Taille</string>
+    <string name="details_dimensions">Dimensions</string>
+    <string name="details_camera">Appareil</string>
+    <string name="details_exposure">Exposition</string>
+    <string name="details_path">Chemin</string>
+    <string name="details_file_name">Nom du fichier</string>
+
+    <!-- Permission -->
+    <string name="permission_title">Galerie a besoin d’accéder à vos photos et vidéos</string>
+    <string name="permission_body">Autorisez l’accès aux photos et vidéos de cet appareil.</string>
+    <string name="permission_open_settings">Ouvrir les paramètres</string>
+
+    <!-- Settings sections -->
+    <string name="settings_title">Paramètres</string>
+    <string name="section_language">Langue</string>
+    <string name="section_grid">Grille</string>
+    <string name="section_folders">Dossiers</string>
+    <string name="section_video">Vidéo</string>
+    <string name="section_advanced">Avancé</string>
+
+    <!-- Settings rows -->
+    <string name="setting_gallery_theme">Thème de la galerie</string>
+    <string name="setting_accent">Couleur d’accent</string>
+    <string name="setting_contrast">Contraste du texte</string>
+    <string name="setting_corner_radius">Rayon des coins</string>
+    <string name="setting_font">Police</string>
+    <string name="setting_interface_size">Taille de l’interface</string>
+    <string name="setting_language">Langue de l’app</string>
+    <string name="setting_sort_all">Tout trier par</string>
+    <string name="setting_folder_columns">Colonnes des dossiers</string>
+    <string name="setting_media_columns">Colonnes des médias</string>
+    <string name="setting_group_media">Grouper les médias par</string>
+    <string name="setting_scroll_direction">Sens de défilement</string>
+    <string name="setting_overlay_ui">Superposer la barre du haut</string>
+    <string name="setting_overlay_ui_hint">Les médias défilent sous le titre et les boutons, qui gardent leur propre fond</string>
+    <string name="setting_folder_name">Afficher les noms des dossiers</string>
+    <string name="setting_folder_count">Afficher le nombre d’éléments</string>
+    <string name="setting_folder_count_hint">Nombre de photos et de vidéos dans chaque dossier</string>
+    <string name="setting_folder_size">Afficher la taille du dossier</string>
+    <string name="setting_folder_size_hint">Taille totale des fichiers dans chaque dossier</string>
+    <string name="setting_cloud_folder_icons">Afficher les icônes des dossiers cloud et de synchronisation</string>
+    <string name="setting_cloud_folder_icons_only_while_syncing">Afficher les icônes uniquement pendant la synchronisation</string>
+    <string name="setting_details_position">Position des détails</string>
+    <string name="setting_ignored">Dossiers ignorés</string>
+    <string name="menu_show_ignored_folders">Afficher les dossiers masqués</string>
+    <string name="menu_hide_ignored_folders">Masquer à nouveau les dossiers</string>
+    <string name="setting_ignored_hint">Dossiers masqués de la galerie</string>
+    <string name="setting_preview_spacing">Espacement des vignettes</string>
+    <string name="setting_crop">Recadrer en carrés</string>
+    <string name="setting_crop_hint">Sinon, conserver le format d’origine</string>
+    <string name="setting_video_duration">Afficher la durée des vidéos</string>
+    <string name="setting_video_duration_hint">Affiche la durée sur les miniatures des vidéos</string>
+    <string name="setting_autoplay">Lire la vidéo suivante</string>
+    <string name="setting_autoplay_hint">À la fin d’une vidéo, passer à la suivante du dossier. Désactivé, elle est répétée.</string>
+    <string name="setting_background_playback">Continuer la lecture en arrière-plan</string>
+    <string name="setting_background_playback_hint">La vidéo continue quand l’app est réduite, contrôlée depuis la notification.</string>
+
+    <!-- Folder preview -->
+
+    <!-- Ignored folders -->
+    <string name="ignored_title">Dossiers ignorés</string>
+    <string name="ignored_hint">%1$d ignorés · cochez un dossier pour le masquer de la galerie</string>
+
+    <!-- Theme mode -->
+    <string name="mode_auto">Auto</string>
+    <string name="mode_light">Clair</string>
+    <string name="mode_dark">Sombre</string>
+    <string name="mode_black">Noir</string>
+
+    <!-- Contrast -->
+    <string name="contrast_soft">Doux</string>
+    <string name="contrast_normal">Normal</string>
+    <string name="contrast_high">Élevé</string>
+
+    <!-- Sorting -->
+    <string name="sort_date_taken">Date de prise</string>
+    <string name="sort_modified">Modification</string>
+    <string name="sort_name">Nom</string>
+    <string name="sort_size">Taille</string>
+    <string name="sort_type">Type de contenu</string>
+    <string name="sort_favorite_added">Ordre d’ajout aux favoris</string>
+
+    <!-- Grouping -->
+    <string name="group_today">Aujourd’hui</string>
+    <string name="group_yesterday">Hier</string>
+    <string name="group_none">Aucun</string>
+    <string name="group_day">Jour</string>
+    <string name="group_month">Mois</string>
+    <string name="group_year">Année</string>
+
+    <!-- Media filter -->
+    <string name="filter_all">Tout</string>
+    <string name="filter_images">Images</string>
+    <string name="filter_videos">Vidéos</string>
+
+    <!-- Spacing -->
+    <string name="spacing_none">Aucun</string>
+    <string name="spacing_small">Petit</string>
+    <string name="spacing_large">Grand</string>
+
+    <!-- Scroll direction -->
+    <string name="scroll_down">Bas</string>
+    <string name="scroll_up">Haut</string>
+
+    <!-- Details placement -->
+    <string name="placement_below">Dessous</string>
+    <string name="placement_overlay">Sur l’image</string>
+
+    <!-- Video fit -->
+    <string name="fit_fit">Ajuster</string>
+    <string name="fit_fill">Remplir</string>
+    <string name="fit_stretch">Étirer</string>
+
+    <!-- App icon colours -->
+
+    <!-- Language and font choices that follow the device -->
+    <string name="follow_system">Système</string>
+
+    <!-- Editor -->
+    <string name="editor_crop">Recadrer</string>
+    <string name="editor_adjust">Régler</string>
+    <string name="editor_brightness">Luminosité</string>
+    <string name="editor_contrast">Contraste</string>
+    <string name="editor_saturation">Saturation</string>
+    <string name="editor_saved">Enregistré comme copie</string>
+    <string name="action_save">Enregistrer</string>
+    <string name="action_reset">Réinitialiser</string>
+    <string name="action_close">Fermer</string>
+    <string name="action_rotate_left">Pivoter à gauche</string>
+    <string name="action_rotate_right">Pivoter à droite</string>
+    <string name="action_mirror">Miroir</string>
+    <string name="crop_free">Libre</string>
+    <string name="editor_exposure">Exposition</string>
+    <string name="editor_highlights">Hautes lumières</string>
+    <string name="editor_shadows">Ombres</string>
+    <string name="editor_whites">Blancs</string>
+    <string name="editor_blacks">Noirs</string>
+    <string name="editor_vibrance">Vibrance</string>
+    <string name="editor_temperature">Température</string>
+    <string name="editor_tint">Teinte</string>
+    <string name="action_undo">Annuler</string>
+    <string name="action_redo">Rétablir</string>
+    <string name="action_edit">Modifier</string>
+    <string name="action_panorama">Vue 360°</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="editor_reset_all">Tout réinitialiser</string>
+    <string name="crop_original">Original</string>
+    <string name="editor_straighten">Redresser</string>
+    <string name="editor_perspective">Perspective</string>
+    <string name="action_flip_vertical">Retourner verticalement</string>
+    <string name="perspective_hint">Faites glisser les coins sur les lignes qui doivent être droites</string>
+    <string name="action_done">OK</string>
+    <string name="action_duplicate">Dupliquer</string>
+    <string name="action_lock">Verrouiller</string>
+    <string name="action_unlock">Déverrouiller</string>
+    <string name="blend_screen">Superposition claire</string>
+    <string name="blend_overlay">Incrustation</string>
+    <string name="blend_multiply">Produit</string>
+    <string name="camera_digital">Numérique</string>
+    <string name="camera_pocket">Compact</string>
+    <string name="camera_zoom">Zoom</string>
+    <string name="camera_instant">Instantané</string>
+    <string name="camera_camcorder">Caméscope</string>
+    <string name="camera_film">Pellicule</string>
+    <string name="camera_glare">Halo</string>
+    <string name="camera_hint_pick">Choisissez un appareil pour donner son style à la photo</string>
+    <string name="camera_hint_settings">Touchez l’appareil choisi pour ses réglages</string>
+    <string name="date_off">Non</string>
+    <string name="date_classic">Classique</string>
+    <string name="date_led">LED</string>
+    <string name="date_white">Blanche</string>
+    <string name="date_ink">Encre</string>
+    <string name="draw_undo_stroke">Retirer le dernier trait</string>
+    <string name="editor_markup">Annotation</string>
+    <string name="markup_pen">Stylo</string>
+    <string name="markup_pencil">Crayon</string>
+    <string name="markup_marker">Feutre</string>
+    <string name="markup_highlighter">Surligneur</string>
+    <string name="markup_line">Ligne</string>
+    <string name="markup_arrow">Flèche</string>
+    <string name="markup_rectangle">Rectangle</string>
+    <string name="markup_ellipse">Ellipse</string>
+    <string name="markup_eraser">Gomme</string>
+    <string name="markup_clear">Effacer les annotations</string>
+    <string name="editor_presets">Préréglages</string>
+    <string name="editor_cameras">Appareils</string>
+    <string name="editor_effects">Effets</string>
+    <string name="editor_text">Texte</string>
+    <string name="editor_fade">Délavé</string>
+    <string name="editor_clarity">Clarté</string>
+    <string name="editor_sharpen">Netteté</string>
+    <string name="editor_glow">Lueur</string>
+    <string name="editor_grain">Grain</string>
+    <string name="editor_vignette">Vignette</string>
+    <string name="editor_curves">Courbes</string>
+    <string name="editor_hsl">TSL</string>
+    <string name="editor_split">Virage</string>
+    <string name="editor_title_curves">Courbe de tons</string>
+    <string name="editor_title_hsl">Mélange des couleurs</string>
+    <string name="editor_title_split">Virage partiel</string>
+    <string name="editor_hue">Teinte</string>
+    <string name="editor_luminance">Luminance</string>
+    <string name="editor_intensity">Intensité</string>
+    <string name="editor_opacity">Opacité</string>
+    <string name="editor_save_changes">Enregistrer les modifications</string>
+    <string name="editor_discard_changes">Abandonner les modifications</string>
+    <string name="editor_hold_to_compare">Maintenir pour comparer</string>
+    <string name="effect_leak">Fuite de lumière</string>
+    <string name="effect_dust">Poussière</string>
+    <string name="effect_scratches">Rayures</string>
+    <string name="effect_burn">Brûlure</string>
+    <string name="effect_vhs">VHS</string>
+    <string name="effect_date">Date</string>
+    <string name="hue_red">Rouge</string>
+    <string name="hue_orange">Orange</string>
+    <string name="hue_yellow">Jaune</string>
+    <string name="hue_green">Vert</string>
+    <string name="hue_aqua">Turquoise</string>
+    <string name="hue_blue">Bleu</string>
+    <string name="hue_purple">Violet</string>
+    <string name="hue_magenta">Magenta</string>
+    <string name="pack_all">Tous</string>
+    <string name="pack_natural">Naturel</string>
+    <string name="pack_warm">Chaud</string>
+    <string name="pack_cool">Froid</string>
+    <string name="pack_film">Pellicule</string>
+    <string name="pack_mono">Mono</string>
+    <string name="preset_clear">Net</string>
+    <string name="preset_soft">Doux</string>
+    <string name="preset_vivid">Vif</string>
+    <string name="preset_matte">Mat</string>
+    <string name="preset_golden">Doré</string>
+    <string name="preset_amber">Ambre</string>
+    <string name="preset_sunset">Couchant</string>
+    <string name="preset_peach">Pêche</string>
+    <string name="preset_ocean">Océan</string>
+    <string name="preset_frost">Givre</string>
+    <string name="preset_dusk">Crépuscule</string>
+    <string name="preset_mint">Menthe</string>
+    <string name="preset_faded">Fané</string>
+    <string name="preset_classic">Classique</string>
+    <string name="preset_retro">Rétro</string>
+    <string name="preset_chrome">Chrome</string>
+    <string name="preset_mono">Mono</string>
+    <string name="preset_mono_soft">Mono doux</string>
+    <string name="preset_mono_deep">Mono profond</string>
+    <string name="preset_silver">Argent</string>
+    <string name="split_highlights_hue">Teinte hautes lum.</string>
+    <string name="split_highlights">Hautes lumières</string>
+    <string name="split_shadows_hue">Teinte des ombres</string>
+    <string name="split_shadows">Ombres</string>
+    <string name="split_balance">Équilibre</string>
+    <string name="stock_soft">Douce</string>
+    <string name="stock_cool">Froide</string>
+    <string name="stock_mono">Mono</string>
+    <string name="text_add">Ajouter du texte</string>
+    <string name="text_align">Alignement</string>
+    <string name="text_hint">Touchez un texte sur la photo ou ajoutez-en un</string>
+    <string name="text_placeholder">Commencez à écrire</string>
+    <string name="text_plate">Fond</string>
+    <string name="action_copy">Copier</string>
+    <string name="action_copy_to">Copier vers</string>
+    <string name="action_move_to">Déplacer vers</string>
+    <string name="action_move">Déplacer</string>
+    <string name="action_rename">Renommer</string>
+    <string name="action_copy_path">Copier le chemin</string>
+    <string name="paths_copied">Chemins copiés</string>
+    <string name="files_new_folder">Nouveau dossier</string>
+    <string name="files_copy_failed">Certains fichiers n\'ont pas pu être copiés</string>
+    <string name="files_move_failed">Certains fichiers n\'ont pas pu être déplacés</string>
+    <string name="files_move_confirm">Déplacer les éléments sélectionnés (%1$d) vers %2$s ?</string>
+    <string name="files_move_location_hint">Android demande aussi l’accès aux données de localisation enregistrées dans les photos pour vous permettre de confirmer ici les prochains déplacements.</string>
+    <string name="files_rename_failed">Impossible de renommer le fichier</string>
+    <string name="folder_recent">Récents</string>
+    <string name="folder_favorites">Favoris</string>
+    <string name="favorites_empty">Aucun favori pour le moment</string>
+    <string name="setting_show_recent">Afficher Récents</string>
+    <string name="setting_show_recent_hint">Toutes les photos et vidéos, les plus récentes d\'abord, en première vignette</string>
+    <string name="setting_viewer_scrim">Fond des barres de la visionneuse</string>
+    <string name="setting_viewer_scrim_hint">Opacité des barres au-dessus d’une photo ou d’une vidéo en plein écran. Tout à droite : noir opaque.</string>
+    <string name="setting_volume_button_paging">Naviguer avec les boutons de volume</string>
+    <string name="setting_volume_button_paging_hint">Utilise les boutons de volume pour passer à la photo précédente ou suivante, ou pour faire défiler une liste.</string>
+    <string name="setting_panorama_all">360° pour tous les médias</string>
+    <string name="setting_panorama_all_hint">Le bouton 360° apparaît sur chaque photo et vidéo. Les fichiers sans métadonnées 360° s’ouvrent à plat et le bouton les affiche en sphère.</string>
+    <string name="action_metadata">Métadonnées</string>
+    <string name="metadata_date">Date</string>
+    <string name="metadata_time">Heure</string>
+    <string name="metadata_description">Description</string>
+    <string name="metadata_author">Auteur</string>
+    <string name="metadata_location">Lieu</string>
+    <string name="metadata_remove_location">Supprimer le lieu</string>
+    <string name="metadata_read_only">Seules les photos JPEG, PNG et WebP peuvent être modifiées</string>
+    <string name="metadata_save_failed">Impossible d\'enregistrer les modifications</string>
+    <string name="details_lens">Objectif</string>
+    <string name="details_focal_length">Focale</string>
+    <string name="action_set_as">Définir comme</string>
+    <string name="section_actions">Barres d’actions</string>
+    <string name="setting_selection_bar">Pendant la sélection</string>
+    <string name="setting_viewer_bar">Pendant l’affichage</string>
+    <string name="actions_hint">Faites glisser pour réordonner. Touchez une action pour la déplacer entre la barre et le menu ⋮, décochez-la pour la masquer.</string>
+    <string name="actions_in_menu">Dans le menu</string>
+    <string name="setting_actions_hint">Choisissez les actions de la barre du bas et celles du menu ⋮</string>
+    <string name="actions_overflow_hint">Si la barre manque de place, les dernières actions passent d’elles-mêmes dans ⋮ et reviennent dès qu’il y a de la place. Rien n’est perdu.</string>
+    <string name="settings_export">Exporter les paramètres</string>
+    <string name="settings_export_hint">Enregistrer les paramètres de l’application dans un fichier JSON</string>
+    <string name="settings_export_saved">Le fichier de paramètres a été enregistré.</string>
+    <string name="settings_export_failed">Impossible d’enregistrer le fichier de paramètres.</string>
+    <string name="settings_import">Importer les paramètres</string>
+    <string name="settings_import_hint">Appliquer les paramètres d’un fichier JSON exporté</string>
+    <string name="settings_import_applied">Paramètres importés</string>
+    <string name="settings_import_failed">Impossible d’importer le fichier de paramètres.</string>
+    <string name="settings_import_sync_review">Vérifiez les connexions aux serveurs et l’accès aux dossiers dans les paramètres de synchronisation.</string>
+    <string name="settings_import_sync_access">Rétablir l’accès au dossier de synchronisation</string>
+    <string name="settings_import_sync_access_failed">Impossible d’accéder au dossier. Sélectionnez le dossier indiqué ci-dessus.</string>
+    <string name="settings_import_cache_review">Vérifiez la limite du cache cloud.</string>
+    <string name="settings_import_lock_review">Vérifiez le verrouillage de l’application sur cet appareil.</string>
+    <string name="setting_about">À propos</string>
+    <string name="update_check">Rechercher des mises à jour</string>
+    <string name="update_checking">Recherche de mises à jour…</string>
+    <string name="update_latest">CloudiPix est à jour.</string>
+    <string name="update_available">Mise à jour disponible</string>
+    <string name="update_available_version">CloudiPix %1$s est disponible au téléchargement.</string>
+    <string name="update_download">Télécharger</string>
+    <string name="update_downloading">Téléchargement de la mise à jour…</string>
+    <string name="update_verifying">Vérification de la mise à jour…</string>
+    <string name="update_install">Installer la mise à jour</string>
+    <string name="update_open_download">Ouvrez Téléchargements → CloudiPix dans le gestionnaire de fichiers, puis touchez le fichier APK téléchargé pour installer la mise à jour.</string>
+    <string name="update_tap_apk">Touchez %1$s pour installer la mise à jour.</string>
+    <string name="update_source_missing">Aucun dépôt de mises à jour n’est configuré pour cette version.</string>
+    <string name="update_release_missing">Aucune version publiée n’a été trouvée dans le dépôt de mises à jour.</string>
+    <string name="update_version_invalid">Le format de version de l’application ou de la publication n’est pas pris en charge.</string>
+    <string name="update_apk_missing">Aucun APK installable n’a été trouvé dans la publication.</string>
+    <string name="update_apk_incompatible">L’APK est invalide ou incompatible avec la version installée de CloudiPix.</string>
+    <string name="update_check_failed">Impossible de rechercher des mises à jour. Réessayez.</string>
+    <string name="update_download_failed">Impossible de télécharger la mise à jour. Réessayez.</string>
+    <string name="setting_about_hint">Version, licence et crédits open source</string>
+    <string name="about_tagline">Les photos de votre téléphone et de votre NAS au même endroit.</string>
+    <string name="about_version">Version</string>
+    <string name="about_info">Connectez un serveur WebDAV ou FTP pour gérer vos albums en ligne et transférer des photos entre dossiers. L’app ne contient aucune publicité et ne collecte aucune donnée d’utilisation ni aucun rapport de plantage.</string>
+    <string name="about_license">Licence</string>
+    <string name="about_section_app">À propos de l’app</string>
+    <string name="about_section_credits">Open source</string>
+    <string name="trash_title">Corbeille</string>
+    <string name="trash_empty">La corbeille est vide</string>
+    <string name="action_restore">Restaurer</string>
+    <string name="action_delete_forever">Supprimer définitivement</string>
+    <string name="editor_saved_to_pictures">Enregistré dans Pictures</string>
+    <string name="editor_save_failed">Impossible d\'enregistrer la photo</string>
+</resources>

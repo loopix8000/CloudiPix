@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cloudipix_name" translatable="false">CloudiPix</string>
+    <string name="cloudipix_back">Back</string>
+    <string name="cloudipix_trash_summary">%1$s items · %2$s</string>
+</resources>

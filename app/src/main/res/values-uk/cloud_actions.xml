@@ -1,0 +1,10 @@
+<resources>
+    <string name="cloud_device">Цей пристрій</string>
+    <string name="cloud_local_folder_path">Цей пристрій · %1$s</string>
+    <string name="cloud_file_error">Не вдалося завершити дію. Перевірте з’єднання, права доступу до папки й назву файлу.</string>
+    <string name="cloud_trash_confirm">Перемістити вибрані елементи (%1$d) до кошика?</string>
+    <string name="cloud_delete_confirm">Видалити вибрані елементи (%1$d) назавжди?</string>
+    <string name="cloud_original_kept">Копії збережено. Оригінали, видалення яких ви не дозволили, залишилися на пристрої.</string>
+    <string name="cloud_source_changed">Копії збережено. Оригінали, змінені під час передавання, залишилися на пристрої.</string>
+    <string name="cloud_working">Обробка вибраних файлів…</string>
+</resources>

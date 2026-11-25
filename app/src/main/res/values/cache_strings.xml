@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="setting_thumbnail_cache">Thumbnail cache</string>
+    <string name="setting_thumbnail_cache_hint">%1$s used · %2$d MiB limit</string>
+    <string name="setting_thumbnail_cache_limit_hint">Enter a whole number of at least 1 MiB. Lowering the limit removes the least recently used thumbnails first.</string>
+    <string name="setting_clear_thumbnail_cache">Clear thumbnail cache</string>
+    <string name="setting_clear_thumbnail_cache_hint">Thumbnails are created again when you browse.</string>
+    <string name="settings_import_thumbnail_cache_review">Check the thumbnail cache limit.</string>
+</resources>

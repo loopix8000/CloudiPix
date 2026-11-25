@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="all_files_access_title">Permitir acesso a todos os arquivos</string>
+    <string name="all_files_access_hint">Para mover e sincronizar pastas do dispositivo, incluindo a pasta Download, é necessário acesso a todos os arquivos.</string>
+    <string name="all_files_access_denied">O acesso a todos os arquivos não foi permitido, então nada foi alterado.</string>
+    <string name="folder_browser_select">Usar esta pasta</string>
+    <string name="folder_browser_up">Subir um nível</string>
+    <string name="folder_browser_empty">Nenhuma pasta aqui</string>
+    <string name="folder_browser_create_failed">Não foi possível criar a pasta</string>
+    <string name="sync_restore_all_files">Permita o acesso a todos os arquivos para restaurar a sincronização de %1$s.</string>
+    <string name="folder_browser_read_failed">Não é possível abrir esta pasta</string>
+</resources>

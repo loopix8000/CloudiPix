@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_sort_direction">Напрям сортування</string>
+    <string name="settings_quick_controls">Основні налаштування</string>
+    <string name="settings_group_app">Керування застосунком</string>
+    <string name="settings_section_privacy">Приватність і дозволи</string>
+    <string name="settings_section_viewer">Керування переглядом</string>
+    <string name="settings_section_cache">Кеш</string>
+    <string name="settings_section_backup">Резервна копія налаштувань</string>
+    <string name="cloudipix_back">Назад</string>
+    <string name="settings_page_advanced">Розширені налаштування</string>
+    <string name="settings_page_advanced_hint">Вигляд папок, керування переглядом, приватність і резервні копії</string>
+    <string name="setting_settings_theme">Тема налаштувань</string>
+    <string name="settings_theme_follow_gallery">Використовувати тему галереї</string>
+</resources>

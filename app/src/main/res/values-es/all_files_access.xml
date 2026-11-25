@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="all_files_access_title">Permitir acceso a todos los archivos</string>
+    <string name="all_files_access_hint">Para mover y sincronizar carpetas del dispositivo, incluida la carpeta Download, se necesita acceso a todos los archivos.</string>
+    <string name="all_files_access_denied">No se permitió el acceso a todos los archivos, así que no se cambió nada.</string>
+    <string name="folder_browser_select">Usar esta carpeta</string>
+    <string name="folder_browser_up">Subir un nivel</string>
+    <string name="folder_browser_empty">No hay carpetas aquí</string>
+    <string name="folder_browser_create_failed">No se pudo crear la carpeta</string>
+    <string name="sync_restore_all_files">Permite el acceso a todos los archivos para restaurar la sincronización de %1$s.</string>
+    <string name="folder_browser_read_failed">No se puede abrir esta carpeta</string>
+</resources>
