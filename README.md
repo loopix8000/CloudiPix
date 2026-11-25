@@ -14,9 +14,9 @@ WebDAV나 FTP 서버의 사진 폴더를 휴대폰 폴더처럼 보는 갤러리
 
 ## 주요 기능
 
-| 갤러리 폴더 목록 | 서버 사진 보기 | 동기화 설정 | 동기화 기록 |
+| 폴더 목록과 탭 | 서버 앨범 | 서버 사진 보기 | 사진 정보 |
 | :---: | :---: | :---: | :---: |
-| <img src="screenshots/cloud-album.png" width="200" alt="갤러리 폴더 목록에서 클라우드 아이콘이 표시된 Atlantic Coast와 Dolomites 앨범" /> | <img src="screenshots/cloud-viewer.png" width="200" alt="서버 사진과 NAS의 Dolomites 경로를 보여 주는 사진 보기 화면" /> | <img src="screenshots/folder-sync.png" width="200" alt="NAS의 Atlantic Coast 폴더에 대한 동기화 저장 위치 설정" /> | <a href="screenshots/folder-sync-history.png"><img src="screenshots/folder-sync-history.png" width="200" alt="WebDAV 폴더의 업로드 1건과 다운로드 4건이 표시된 양방향 동기화 기록" /></a> |
+| <img src="screenshots/folders-tabs.png" width="200" alt="Main과 Travel 탭, 구름 아이콘이 표시된 NAS 앨범과 휴대폰 앨범이 함께 보이는 폴더 목록" /> | <img src="screenshots/cloud-album.png" width="200" alt="NAS의 Dolomites 앨범에 있는 사진 12장의 썸네일" /> | <img src="screenshots/cloud-viewer.png" width="200" alt="NAS에서 원본을 연 Tre Cime in the Clouds 사진" /> | <img src="screenshots/cloud-viewer-info.png" width="200" alt="파일 크기, 해상도와 NAS의 Dolomites 경로를 보여 주는 사진 정보 패널" /> |
 
 ### 클라우드: 네트워크 폴더를 휴대폰 폴더처럼
 
@@ -25,6 +25,10 @@ WebDAV나 FTP 서버의 사진 폴더를 휴대폰 폴더처럼 보는 갤러리
 - **연결이 끊겨도 목록 유지:** 한 번 불러온 앨범은 서버에 연결되지 않을 때도 목록과 썸네일을 보여 줍니다.
 - **양방향 동기화:** 휴대폰에도 두고 싶은 폴더는 동기화를 켭니다. 폴더마다 저장 위치를 정하고, 양쪽의 추가·수정·삭제를 서로 맞춥니다. 동기화 기록에서 결과를 확인할 수 있습니다.
 - **휴대폰과 서버 사이 정리:** 사진을 휴대폰과 서버 폴더 사이에서 복사하거나 옮길 수 있습니다.
+
+| 동기화 설정 | 동기화 기록 |
+| :---: | :---: |
+| <img src="screenshots/folder-sync.png" width="200" alt="NAS의 Atlantic Coast 폴더에 대한 동기화 저장 위치 설정" /> | <img src="screenshots/folder-sync-history.png" width="200" alt="WebDAV 폴더의 업로드 1건과 다운로드 4건이 표시된 양방향 동기화 기록" /> |
 
 ### 탭: 폴더를 주제별로 정리
 
