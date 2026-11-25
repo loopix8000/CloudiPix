@@ -5,9 +5,12 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import app.cloudipix.gallery.core.cache.MEBIBYTE
+import app.cloudipix.gallery.core.media.RangeReader
 import app.cloudipix.gallery.core.media.ThumbnailStorage
 import app.cloudipix.gallery.core.media.ThumbnailTarget
 import app.cloudipix.gallery.core.media.decodeThumbnail
+import app.cloudipix.gallery.core.media.embeddedFormat
+import app.cloudipix.gallery.core.media.readEmbeddedThumbnail
 import app.cloudipix.gallery.core.media.scaleAndRecycle
 import app.cloudipix.gallery.core.media.thumbnailDispatcher
 import app.cloudipix.gallery.core.model.MediaType
@@ -44,12 +47,31 @@ class RemoteImages @Inject constructor(
     }
     private val originalTransfers = Semaphore(1)
     private val previewTransfers = Semaphore(2)
+    // 내장 썸네일은 파일의 필요한 부분만 읽어 금방 끝나므로 고화질 썸네일 전송을 기다리지 않고 따로 더 많이 받는다.
+    private val embeddedTransfers = Semaphore(4)
     private val originalLocks = Array(32) { Mutex() }
     private val thumbnails = storage.remote
 
     /** 서버 사진의 썸네일을 로컬 사진과 같은 캐시에서 [target]에 맞춰 돌려준다. */
     internal suspend fun thumbnail(uri: Uri, target: ThumbnailTarget): Bitmap =
         thumbnails.get("$uri$PREVIEW_KEY_SUFFIX", target) { createThumbnail(uri, it) } ?: throw IOException()
+
+    /**
+     * 고화질 썸네일을 받는 동안 먼저 보여 줄 내장 썸네일. 파일에서 썸네일이 있는 부분만 받아 꺼낸다.
+     * 화면에 잠깐 보여 주는 용도라 캐시하지 않는다.
+     * 고화질 썸네일이나 원본이 이미 있으면 고화질 썸네일이 금방 준비되므로 받지 않는다.
+     */
+    internal suspend fun embeddedThumbnail(uri: Uri, target: ThumbnailTarget): Bitmap = withContext(Dispatchers.IO) {
+        val (server, photo) = gallery.source(uri) ?: throw IOException()
+        val format = embeddedFormat(photo.mimeType, photo.name)?.takeIf { photo.type == MediaType.Image }
+            ?: throw IOException("내장 썸네일이 없는 형식입니다.")
+        if (thumbnails.has("$uri$PREVIEW_KEY_SUFFIX", target) || cache.contains(uri.toString())) {
+            throw IOException("고화질 썸네일을 바로 만들 수 있습니다.")
+        }
+        val reader = RangeReader { offset, length -> transport.readRange(server, photo.path, offset, length) }
+        embeddedTransfers.withPermit { readEmbeddedThumbnail(format, reader, target.stored()) }
+            ?: throw IOException("내장 썸네일이 없습니다.")
+    }
 
     internal suspend fun <T> withOriginal(uri: Uri, block: suspend (File) -> T): T = withContext(Dispatchers.IO) {
         open(uri).use { block(it.file().toFile()) }
@@ -93,10 +115,16 @@ class RemoteImages @Inject constructor(
         val video = photo.type == MediaType.Video
         if (!video) cache.open(uri.toString())?.use { return@withContext decode(it.file().toFile(), target) }
         // 내려받는 동안에는 로컬 썸네일의 디코딩 자리를 차지하지 않는다.
-        previewTransfers.withPermit { downloadThumbnail(server, photo, video, target) }
+        previewTransfers.withPermit { downloadThumbnail(uri, server, photo, video, target) }
     }
 
-    private suspend fun downloadThumbnail(server: RemoteServer, photo: RemotePhoto, video: Boolean, target: ThumbnailTarget): Bitmap {
+    private suspend fun downloadThumbnail(
+        uri: Uri,
+        server: RemoteServer,
+        photo: RemotePhoto,
+        video: Boolean,
+        target: ThumbnailTarget,
+    ): Bitmap {
         val input = File.createTempFile("image-", ".tmp", staging)
         try {
             if (photo.preview != null) {
@@ -116,6 +144,10 @@ class RemoteImages @Inject constructor(
                 }
             }
             input.outputStream().use { transport.download(server, photo.path, it, MAX_ORIGINAL_BYTES) }
+            // 썸네일을 만들려고 받은 원본은 뷰어에서 다시 받지 않도록 원본 캐시에 남긴다.
+            if (photo.size <= 0 || input.length() == photo.size) {
+                cache.store(uri.toString(), input)?.use { return decode(it.file().toFile(), target) }
+            }
             return decode(input, target)
         } finally {
             input.delete()

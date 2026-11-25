@@ -2,13 +2,17 @@ package app.cloudipix.gallery.ui.component
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -19,13 +23,18 @@ import app.cloudipix.gallery.ui.theme.GalleryTheme
 import coil3.Image
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import coil3.SingletonImageLoader
 import coil3.compose.LocalPlatformContext
+import coil3.memory.MemoryCache
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.transformations
 
 /**
  * 격자 타일의 썸네일입니다. [coverPixels]를 주면 그 크기로 불러오고, [blurred]이면 흐리게 처리합니다.
+ * [quickPreview]이면 고화질 썸네일이 준비될 때까지 내장 썸네일을 먼저 보여 줍니다. 동영상처럼 먼저 보여 줄
+ * 썸네일이 없는 항목은 false로 두어 실패할 요청을 만들지 않습니다.
  *
  * 원격 사진은 같은 사진의 새 버전을 받는 동안이나 받지 못했을 때 마지막으로 보여 준 이미지를
  * 그대로 두어 타일이 비거나 깜박이지 않게 합니다.
@@ -39,6 +48,7 @@ fun MediaThumbnail(
     description: String? = null,
     blurred: Boolean = false,
     coverPixels: Int? = null,
+    quickPreview: Boolean = true,
 ) {
     val context = LocalPlatformContext.current
     val radius = GalleryTheme.corners.radius
@@ -66,15 +76,44 @@ fun MediaThumbnail(
         }
     }
 
+    // 고화질 썸네일이 메모리에 없으면 그동안 내장 썸네일을 아래에 깔아 둡니다. 잠깐 보여 주는 용도라 캐시하지 않습니다.
+    // 고화질 썸네일을 보여 주면 내장 썸네일은 내려놓고, 고화질 썸네일을 받지 못하면 계속 보여 줍니다.
+    var fullShown by remember(model, blurred) { mutableStateOf(false) }
+    val embeddedRequest = remember(context, model, blurred, coverPixels, quickPreview) {
+        model?.takeIf { quickPreview && !blurred && SingletonImageLoader.get(context).memoryCache?.get(MemoryCache.Key(it.toString())) == null }
+            ?.let { uri ->
+                val builder = ImageRequest.Builder(context)
+                    .data(Thumbnail(uri, embedded = true))
+                    .memoryCachePolicy(CachePolicy.DISABLED)
+                    .crossfade(false)
+                coverPixels?.let { builder.size(it, it) }
+                builder.build()
+            }
+    }
+    val contentScale = if (crop) ContentScale.Crop else ContentScale.Fit
+
     key(blurred) {
-        AsyncImage(
-            model = request,
-            contentDescription = description,
-            modifier = tile,
-            contentScale = if (crop) ContentScale.Crop else ContentScale.Fit,
-            onState = lastShown?.let { memory ->
-                { state -> if (state is AsyncImagePainter.State.Success) memory.value = state.result.image }
-            },
-        )
+        Box(tile) {
+            if (embeddedRequest != null && !fullShown) {
+                AsyncImage(
+                    model = embeddedRequest,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = contentScale,
+                )
+            }
+            AsyncImage(
+                model = request,
+                contentDescription = description,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = contentScale,
+                onState = { state ->
+                    if (state is AsyncImagePainter.State.Success) {
+                        fullShown = true
+                        lastShown?.value = state.result.image
+                    }
+                },
+            )
+        }
     }
 }

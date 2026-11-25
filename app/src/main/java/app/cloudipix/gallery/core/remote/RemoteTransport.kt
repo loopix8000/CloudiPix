@@ -2,6 +2,7 @@ package app.cloudipix.gallery.core.remote
 
 import android.net.Uri
 import android.util.Xml
+import app.cloudipix.gallery.core.media.readUpTo
 import app.cloudipix.gallery.core.model.hasHiddenFolderSegment
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -251,6 +252,23 @@ class RemoteTransport @Inject constructor() {
                 count
             }
         }
+    }
+
+    /**
+     * 파일의 [offset]부터 [length] 바이트까지 읽는다. 파일이 짧으면 있는 만큼만 돌려준다.
+     * WebDAV는 범위 요청으로 그만큼만 받고, 범위 요청을 무시하는 서버나 FTP에서도 그만큼 읽은 뒤 연결을 닫는다.
+     */
+    internal fun readRange(server: RemoteServer, path: String, offset: Long, length: Int): ByteArray = when (server.protocol) {
+        RemoteProtocol.WebDav -> {
+            val url = sameOrigin(server, path) ?: throw RemoteRequestException(RemoteFailure.Address)
+            val get = request(server, url).get().header("Range", "bytes=$offset-${offset + length - 1}")
+            execute(get.build(), fileHttp).use { response ->
+                val stream = response.body?.byteStream() ?: throw IOException()
+                if (offset > 0 && response.code != 206) stream.skipFully(offset)
+                stream.readUpTo(length)
+            }
+        }
+        RemoteProtocol.Ftp -> openRead(server, path, offset).use { it.readUpTo(length) }
     }
 
     /**

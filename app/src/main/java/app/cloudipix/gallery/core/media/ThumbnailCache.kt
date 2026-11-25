@@ -11,6 +11,7 @@ import app.cloudipix.gallery.core.settings.SettingsRepository
 import coil3.disk.DiskCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -113,6 +114,22 @@ internal class ThumbnailCache(private val disk: LimitedDiskCache) {
             if (!writing) lock.unlock()
         }
     }
+
+    /** [key]에 [target]을 덮는 미리보기가 디스크에 있는지 이미지를 디코딩하지 않고 본다. */
+    suspend fun has(key: String?, target: ThumbnailTarget): Boolean {
+        if (key == null) return false
+        val stored = target.stored()
+        return withContext(Dispatchers.IO) { disk.use { it.hasPreview(key, stored) } }
+    }
+}
+
+private fun DiskCache.hasPreview(key: String, stored: ThumbnailTarget): Boolean = try {
+    openSnapshot(key)?.use { snapshot ->
+        val preview = StoredPreview.parse(fileSystem.read(snapshot.metadata) { readUtf8() })
+        preview != null && (preview.complete || covers(preview.width, preview.height, stored.size, stored.fill))
+    } ?: false
+} catch (_: IOException) {
+    false
 }
 
 private fun DiskCache.read(key: String, stored: ThumbnailTarget, target: ThumbnailTarget): Bitmap? = try {
@@ -171,4 +188,6 @@ private fun thumbnailWorkers(count: Int, name: String) = Executors.newFixedThrea
 }.asCoroutineDispatcher()
 
 internal val thumbnailDispatcher = thumbnailWorkers(2, "Gallery thumbnail decode")
+// 내장 썸네일은 작고 금방 끝나므로 원본 디코딩 대기열 뒤에 서지 않도록 따로 처리한다.
+internal val embeddedThumbnailDispatcher = thumbnailWorkers(2, "Gallery embedded thumbnail")
 private val thumbnailWriter = thumbnailWorkers(1, "Gallery thumbnail write")

@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.CancellationSignal
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.Size
 import app.cloudipix.gallery.core.remote.REMOTE_MEDIA_SCHEME
@@ -40,8 +41,11 @@ private const val DEFAULT_EDGE_PX = 512
 /**
  * 격자 썸네일 요청입니다. Coil은 이 값을 [ThumbnailFetcher]로 불러오고,
  * 메모리 캐시 키는 URI 문자열입니다([ThumbnailKeyer]).
+ *
+ * [embedded]이면 고화질 썸네일이 준비되기 전에 잠깐 보여 줄 내장 썸네일을 요청합니다. 캐시하지 않습니다.
+ * 고화질 썸네일이 이미 디스크에 있거나 빠르게 보여 줄 썸네일이 없으면 실패합니다.
  */
-data class Thumbnail(val uri: Uri) {
+data class Thumbnail(val uri: Uri, val embedded: Boolean = false) {
     /** 정사각형으로 자르지 않은 전체 구도 미리보기의 메모리 캐시 키입니다. */
     val uncroppedKey: MemoryCache.Key get() = MemoryCache.Key("uncropped-thumbnail:$uri")
 }
@@ -93,6 +97,7 @@ class ThumbnailFetcher internal constructor(
     )
 
     override suspend fun fetch(): FetchResult {
+        if (data.embedded) return sampled(fetchEmbedded())
         if (data.uri.scheme == REMOTE_MEDIA_SCHEME) {
             return sampled(remoteImages.thumbnail(data.uri, target))
         }
@@ -107,6 +112,33 @@ class ThumbnailFetcher internal constructor(
             decoded ?: loadSystemThumbnail(wanted)
         }
         return if (cached != null) sampled(cached) else originalSource()
+    }
+
+    /**
+     * 고화질 썸네일을 만드는 동안 잠깐 보여 줄 썸네일입니다. 고화질 썸네일이 이미 디스크에 있으면 바로 준비되므로 만들지 않습니다.
+     * JPEG·HEIF·RAW는 파일에 든 썸네일을 서버 사진과 같은 방법으로 꺼냅니다. 내장 썸네일이 없거나 PNG처럼 담을 수 없는
+     * 형식이면 시스템 썸네일을 씁니다. 동영상은 고화질 썸네일도 시스템 썸네일이라 따로 만들지 않습니다.
+     */
+    private suspend fun fetchEmbedded(): Bitmap {
+        if (data.uri.scheme == REMOTE_MEDIA_SCHEME) return remoteImages.embeddedThumbnail(data.uri, target)
+        return withContext(embeddedThumbnailDispatcher) {
+            val resolver = context.contentResolver
+            val mimeType = resolver.getType(data.uri)
+            if (mimeType?.startsWith("video/") == true) throw IOException("동영상은 시스템 썸네일을 바로 씁니다.")
+            if (thumbnails.has(cacheKey(), target)) throw IOException("고화질 썸네일이 이미 있습니다.")
+            val embedded = embeddedFormat(mimeType, data.uri.lastPathSegment)?.let { format ->
+                try {
+                    resolver.openFileDescriptor(data.uri, "r")?.let { ParcelFileDescriptor.AutoCloseInputStream(it) }?.use { input ->
+                        readEmbeddedThumbnail(format, FileRangeReader(input.channel), target)
+                    }
+                } catch (_: IOException) {
+                    null
+                }
+            }
+            // 시스템 썸네일은 미디어 저장소 항목만 저장소가 따로 보관하므로 그 밖의 제공자에는 쓰지 않습니다.
+            val quick = embedded ?: if (data.uri.authority == MediaStore.AUTHORITY) loadSystemThumbnail(target) else null
+            quick ?: throw IOException("빠르게 보여 줄 썸네일이 없습니다.")
+        }
     }
 
     private fun sampled(bitmap: Bitmap): FetchResult =
@@ -174,7 +206,11 @@ class ThumbnailFetcher internal constructor(
     }
 }
 
-/** 썸네일 메모리 캐시 키는 URI 문자열입니다. 뷰어가 같은 키로 캐시된 썸네일을 찾습니다. */
+/**
+ * 썸네일 메모리 캐시 키는 URI 문자열입니다. 뷰어가 같은 키로 캐시된 썸네일을 찾습니다.
+ * 내장 썸네일 요청은 메모리 캐시를 쓰지 않지만, 고화질 썸네일과 섞이지 않도록 키를 따로 둡니다.
+ */
 class ThumbnailKeyer : Keyer<Thumbnail> {
-    override fun key(data: Thumbnail, options: Options): String = data.uri.toString()
+    override fun key(data: Thumbnail, options: Options): String =
+        if (data.embedded) "embedded-thumbnail:${data.uri}" else data.uri.toString()
 }

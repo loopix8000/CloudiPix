@@ -435,6 +435,7 @@ internal fun MediaTile(
             model = medium.displayUri,
             modifier = Modifier.fillMaxSize().then(inset).then(thumbnailModifier),
             description = medium.name,
+            quickPreview = medium.type != MediaType.Video,
         )
         val knownLength = medium.durationMs > 0
         // 길이를 모르는 동영상(서버 동영상)은 설정과 관계없이 동영상임을 표시합니다.

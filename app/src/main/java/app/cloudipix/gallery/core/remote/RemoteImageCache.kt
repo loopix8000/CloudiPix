@@ -33,6 +33,8 @@ class RemoteImageCache @Inject constructor(
 
     internal suspend fun open(key: String): ImageSource? = source { it.openSnapshot(key) }
 
+    internal suspend fun contains(key: String): Boolean = open(key)?.use { true } ?: false
+
     internal suspend fun store(key: String, file: File): ImageSource? = source { cache ->
         if (file.length() > cache.maxSize) return@source null
         val editor = cache.openEditor(key) ?: return@source null
