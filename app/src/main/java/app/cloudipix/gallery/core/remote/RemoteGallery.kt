@@ -179,6 +179,22 @@ class RemoteGallery @Inject internal constructor(
 
     internal val albums: Flow<List<RemoteAlbum>> = visibleAlbumsByServer.map { it.values.flatten() }
 
+    internal suspend fun indexedFavoritePhotos(ids: Set<Long>): Map<Long, RemotePhoto> {
+        if (ids.isEmpty()) return emptyMap()
+        val photos = mutableMapOf<Long, RemotePhoto>()
+        for (snapshot in snapshots.value.values) {
+            for (album in snapshot.albums) {
+                currentCoroutineContext().ensureActive()
+                for (photo in album.photos) {
+                    if (photo.id !in ids) continue
+                    photos[photo.id] = photo
+                    if (photos.size == ids.size) return photos
+                }
+            }
+        }
+        return photos
+    }
+
     internal val trash = combine(registered, snapshots) { servers, cached ->
         servers.flatMap { server -> cached[server.id]?.albums.orEmpty().flatMap { album ->
             album.trash.map { it.asMedium(album.id) }

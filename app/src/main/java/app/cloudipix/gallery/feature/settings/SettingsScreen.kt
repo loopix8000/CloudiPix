@@ -139,6 +139,8 @@ fun SettingsScreen(
                     if (!result.syncRestored) add(R.string.settings_import_sync_review)
                     if (!result.cacheRestored) add(R.string.settings_import_cache_review)
                     if (!result.thumbnailCacheRestored) add(R.string.settings_import_thumbnail_cache_review)
+                    if (!result.favoritesRestored) add(R.string.settings_import_favorites_review)
+                    if (!result.tabFoldersRestored) add(R.string.settings_import_tab_folders_review)
                     if (!result.appLockMatches) add(R.string.settings_import_lock_review)
                 }
                 if (importNotes.isEmpty() && viewModel.syncRestoreAccess.value.isEmpty()) {

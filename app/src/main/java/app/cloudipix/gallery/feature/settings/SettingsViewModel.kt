@@ -9,12 +9,25 @@ import app.cloudipix.gallery.core.model.Grouping
 import app.cloudipix.gallery.core.model.SortKey
 import app.cloudipix.gallery.core.settings.GallerySettings
 import app.cloudipix.gallery.core.cache.CacheUsage
+import app.cloudipix.gallery.core.database.FavoriteDao
 import app.cloudipix.gallery.core.media.ThumbnailStorage
 import app.cloudipix.gallery.core.model.ScrollDirection
+import app.cloudipix.gallery.core.remote.REMOTE_MEDIA_SCHEME
+import app.cloudipix.gallery.core.remote.RemoteGallery
 import app.cloudipix.gallery.core.remote.RemoteImageCache
+import app.cloudipix.gallery.core.remote.findServer
+import app.cloudipix.gallery.core.remote.isRemoteId
+import app.cloudipix.gallery.core.remote.remoteFavoriteKey
+import app.cloudipix.gallery.core.remote.remoteId
 import app.cloudipix.gallery.core.security.GalleryLocks
+import app.cloudipix.gallery.core.settings.FavoriteBackup
+import app.cloudipix.gallery.core.settings.FolderTabBackup
 import app.cloudipix.gallery.core.settings.Language
+import app.cloudipix.gallery.core.settings.RemoteFavoriteLocation
+import app.cloudipix.gallery.core.settings.SettingsExport
 import app.cloudipix.gallery.core.settings.SettingsRepository
+import app.cloudipix.gallery.core.settings.TabFolderRestore
+import app.cloudipix.gallery.core.settings.tabFolderIds
 import app.cloudipix.gallery.core.sync.FolderSync
 import app.cloudipix.gallery.core.sync.SyncRestoreAccess
 import app.cloudipix.gallery.ui.theme.DetailsPlacement
@@ -23,12 +36,14 @@ import app.cloudipix.gallery.ui.theme.TextScale
 import app.cloudipix.gallery.ui.theme.ThemeMode
 import app.cloudipix.gallery.ui.theme.ScreenTheme
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 internal data class SettingsImportResult(
@@ -37,15 +52,20 @@ internal data class SettingsImportResult(
     val cacheRestored: Boolean,
     val thumbnailCacheRestored: Boolean,
     val appLockMatches: Boolean,
+    val favoritesRestored: Boolean,
+    val tabFoldersRestored: Boolean,
 )
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(
+class SettingsViewModel @Inject internal constructor(
     private val repository: SettingsRepository,
     private val locks: GalleryLocks,
     private val cache: RemoteImageCache,
     private val thumbnails: ThumbnailStorage,
     private val folderSync: FolderSync,
+    private val favorites: FavoriteDao,
+    private val remote: RemoteGallery,
+    private val tabFolders: FolderTabBackup,
 ) : ViewModel() {
 
     val settings: StateFlow<GallerySettings> =
@@ -82,7 +102,8 @@ class SettingsViewModel @Inject constructor(
 
     internal fun exportSettings(destination: Uri, onResult: (Boolean) -> Unit) = settingsFileAction {
         val saved = attemptSettingsFileAction {
-            repository.exportSettings(destination, locks.settings.value, folderSync.settingsForExport())
+            val sync = folderSync.settingsForExport()
+            repository.exportSettings(destination, locks.settings.value, sync, favoritesForExport(), tabFolders::locations)
         } != null
         onResult(saved)
     }
@@ -90,7 +111,11 @@ class SettingsViewModel @Inject constructor(
     internal fun importSettings(source: Uri, onResult: (SettingsImportResult?) -> Unit) = settingsFileAction {
         val result = attemptSettingsFileAction {
             val backup = repository.readSettingsFile(source)
-            val languageChanged = repository.restoreSettings(backup.settings)
+            val serverIds = backupServerIds(backup)
+            val tabs = attemptSettingsFileAction { tabFolders.restore(backup, serverIds) }
+                ?: TabFolderRestore(backup.settings, complete = false)
+            val languageChanged = repository.restoreSettings(tabs.settings)
+            val favoritesRestored = attemptSettingsFileAction { restoreFavorites(backup, serverIds) } == true
             locks.setHideRecentsPreview(backup.hideRecentsPreview)
             val cacheRestored = attemptSettingsFileAction { cache.resize(backup.remoteCacheLimitMiB) } != null
             // 썸네일 캐시 한도가 없는 이전 백업은 지금 한도를 그대로 둔다.
@@ -101,11 +126,62 @@ class SettingsViewModel @Inject constructor(
             pendingSyncAccess.value = sync?.pending.orEmpty()
             val syncRestored = backup.sync == null || sync?.complete == true
             SettingsImportResult(
-                languageChanged, syncRestored, cacheRestored, thumbnailCacheRestored,
-                locks.settings.value.app == backup.appLock,
+                languageChanged = languageChanged,
+                syncRestored = syncRestored,
+                cacheRestored = cacheRestored,
+                thumbnailCacheRestored = thumbnailCacheRestored,
+                appLockMatches = locks.settings.value.app == backup.appLock,
+                favoritesRestored = favoritesRestored,
+                tabFoldersRestored = tabs.complete,
             )
         }
         onResult(result)
+    }
+
+    private suspend fun favoritesForExport(): List<FavoriteBackup> = withContext(Dispatchers.Default) {
+        val keys = favorites.pathsForBackup()
+        val remotePrefix = "$REMOTE_MEDIA_SCHEME:"
+        val idsByKey = buildMap {
+            for (key in keys) {
+                if (!key.startsWith(remotePrefix)) continue
+                key.removePrefix(remotePrefix).toLongOrNull()?.let { put(key, it) }
+            }
+        }
+        // 서버 ID가 달라지는 기기에서 해시 키를 다시 만들 수 있도록 이미 읽은 경로를 함께 저장한다.
+        val photos = remote.indexedFavoritePhotos(idsByKey.values.toSet())
+        keys.map { key ->
+            val photo = idsByKey[key]?.let { photos[it] }
+            FavoriteBackup(key, photo?.let { RemoteFavoriteLocation(it.serverId, it.path) })
+        }
+    }
+
+    private suspend fun backupServerIds(backup: SettingsExport): Map<String, String> = withContext(Dispatchers.Default) {
+        val serverBackups = backup.sync?.cloudFolders.orEmpty()
+        val needsServerIds = backup.favorites.any { it.remote != null } || backup.settings.tabFolderIds().any(::isRemoteId)
+        if (serverBackups.isEmpty() || !needsServerIds) return@withContext emptyMap()
+        val servers = attemptSettingsFileAction { remote.connectionsForSync() }.orEmpty()
+        serverBackups.mapNotNull { saved ->
+            saved.findServer(servers, allowLegacySingleMatch = false)?.let { saved.serverId to it.id }
+        }.toMap()
+    }
+
+    private suspend fun restoreFavorites(backup: SettingsExport, serverIds: Map<String, String>): Boolean = withContext(Dispatchers.Default) {
+        if (backup.favorites.isEmpty()) return@withContext true
+        var complete = true
+        val paths = backup.favorites.map { favorite ->
+            val location = favorite.remote ?: return@map favorite.key
+            val serverId = serverIds[location.serverId]
+            if (serverId == null) {
+                complete = false
+                favorite.key
+            } else if (serverId == location.serverId) {
+                favorite.key
+            } else {
+                remoteFavoriteKey(remoteId(serverId, location.path))
+            }
+        }
+        favorites.restoreBackup(paths)
+        complete
     }
 
     internal fun allowSyncRestore(uri: Uri, onResult: (Boolean?) -> Unit) = settingsFileAction {

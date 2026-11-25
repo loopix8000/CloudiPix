@@ -373,6 +373,8 @@
     <string name="settings_import_sync_access">동기화 폴더 접근 허용</string>
     <string name="settings_import_sync_access_failed">선택한 폴더에 접근할 수 없습니다. 위에 표시된 폴더를 선택해 주세요.</string>
     <string name="settings_import_cache_review">클라우드 캐시 용량 설정을 확인해 주세요.</string>
+    <string name="settings_import_favorites_review">일부 즐겨찾기를 복원하지 못했습니다.</string>
+    <string name="settings_import_tab_folders_review">일부 탭의 폴더를 찾지 못했습니다. 기기 저장소나 클라우드 서버 연결을 확인해 주세요.</string>
     <string name="settings_import_lock_review">이 기기에서 앱 잠금 설정을 확인해 주세요.</string>
     <string name="setting_about">앱 정보</string>
     <string name="update_check">업데이트 확인</string>

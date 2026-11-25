@@ -208,6 +208,22 @@ interface FavoriteDao {
     @Query("SELECT * FROM favorites")
     fun entries(): Flow<List<FavoriteEntity>>
 
+    @Query("SELECT path FROM favorites ORDER BY added_order, path")
+    suspend fun pathsForBackup(): List<String>
+
+    @Query("SELECT COALESCE(MAX(added_order), 0) FROM favorites")
+    suspend fun latestOrder(): Long
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMissing(entries: List<FavoriteEntity>)
+
+    @Transaction
+    suspend fun restoreBackup(paths: List<String>) {
+        if (paths.isEmpty()) return
+        val latestOrder = latestOrder()
+        insertMissing(paths.mapIndexed { index, path -> FavoriteEntity(path, latestOrder + index + 1) })
+    }
+
     @Query("INSERT OR IGNORE INTO favorites(path, added_order) SELECT :path, COALESCE(MAX(added_order), 0) + 1 FROM favorites")
     suspend fun add(path: String)
 

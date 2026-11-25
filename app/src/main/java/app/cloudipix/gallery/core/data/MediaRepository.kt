@@ -276,10 +276,15 @@ class MediaRepository @Inject constructor(
         settings.remapFolders(change.folders.associate { it.oldId to it.newId })
     }
 
-    private val deviceFolderEntries = media.allFolders().distinctUntilChanged().map { rows ->
+    private val indexedDeviceFolders = media.allFolders().distinctUntilChanged().map { rows ->
         val volumes = paths.volumes(rows.map { it.mediaId })
         rows.map { FolderEntry(it.bucketId, it.bucketName, it.relativePath, it.itemCount, volumes[it.mediaId]) }
-    }.shareIn(repositoryScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), replay = 1)
+    }
+    private val deviceFolderEntries = indexedDeviceFolders
+        .shareIn(repositoryScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), replay = 1)
+
+    internal suspend fun deviceFoldersForBackup(): List<FolderEntry> =
+        deviceFolderEntries.replayCache.lastOrNull() ?: indexedDeviceFolders.first()
 
     val folderEntries: Flow<List<FolderEntry>> =
         combine(

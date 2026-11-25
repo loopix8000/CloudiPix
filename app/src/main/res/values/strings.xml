@@ -375,6 +375,8 @@
     <string name="settings_import_sync_access">Restore sync folder access</string>
     <string name="settings_import_sync_access_failed">Couldn’t access that folder. Select the folder shown above.</string>
     <string name="settings_import_cache_review">Check the cloud cache limit.</string>
+    <string name="settings_import_favorites_review">Some favorites could not be restored.</string>
+    <string name="settings_import_tab_folders_review">Some tab folders could not be matched. Check that their device storage or cloud server is available.</string>
     <string name="settings_import_lock_review">Confirm your app lock preference on this device.</string>
     <string name="setting_about">About</string>
     <string name="update_check">Check for updates</string>

@@ -127,6 +127,20 @@ internal data class SettingsExport(
     val appLock: Boolean,
     val hideRecentsPreview: Boolean,
     val sync: FolderSyncSettingsExport? = null,
+    val favorites: List<FavoriteBackup> = emptyList(),
+    val tabFolderLocations: Map<Long, TabFolderLocation> = emptyMap(),
+)
+
+@Serializable
+internal data class FavoriteBackup(
+    val key: String,
+    val remote: RemoteFavoriteLocation? = null,
+)
+
+@Serializable
+internal data class RemoteFavoriteLocation(
+    val serverId: String,
+    val path: String,
 )
 
 private val settingsExportJson = Json {
@@ -203,15 +217,20 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         destination: Uri,
         locks: LockSettings,
         sync: FolderSyncSettingsExport,
+        favorites: List<FavoriteBackup>,
+        tabFolderLocations: suspend (GallerySettings) -> Map<Long, TabFolderLocation>,
     ) = withContext(Dispatchers.IO) {
         val preferences = context.dataStore.data.first()
+        val settings = readSettings(preferences)
         val export = SettingsExport(
-            settings = readSettings(preferences),
+            settings = settings,
             remoteCacheLimitMiB = preferences[Keys.remoteCacheLimitMiB] ?: DEFAULT_REMOTE_CACHE_MIB,
             thumbnailCacheLimitMiB = preferences[Keys.thumbnailCacheLimitMiB] ?: DEFAULT_THUMBNAIL_CACHE_MIB,
             appLock = locks.app,
             hideRecentsPreview = locks.hideRecentsPreview,
             sync = sync,
+            favorites = favorites,
+            tabFolderLocations = tabFolderLocations(settings),
         )
         val json = settingsExportJson.encodeToString(export)
         val output = context.contentResolver.openOutputStream(destination)
