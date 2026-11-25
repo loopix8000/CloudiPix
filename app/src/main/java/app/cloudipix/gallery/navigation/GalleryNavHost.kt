@@ -159,9 +159,10 @@ private const val PHOTO_MAX_TRAVEL_MS = 40
 private const val PHOTO_CLOSE_HANDOFF_MS = 50
 private const val SETTINGS_SLIDE_MS = 300
 private const val SETTINGS_PARALLAX_DIVISOR = 4
-// 열 때는 점차 감속하고 닫을 때는 반대로 가속한다.
+// 열 때와 닫을 때 모두 바로 움직이기 시작해 도착 지점에서 감속한다.
+// 닫을 때 가속 곡선을 쓰면 처음에는 뷰어 배경만 보이다가 마지막 두세 프레임에 사진이 칸으로 순간 이동해 끊겨 보인다.
 private val photoOpenEasing = CubicBezierEasing(0.30f, 0.54f, 0.52f, 1f)
-private val photoCloseEasing = CubicBezierEasing(0.55f, 0f, 0.75f, 0.35f)
+private val photoCloseEasing = photoOpenEasing
 private val photoBackdropEasing = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun photoBoundsTransform(opening: Boolean, windowShortSide: Int) = BoundsTransform { from, to ->
