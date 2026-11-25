@@ -109,8 +109,7 @@ class FoldersViewModel @Inject constructor(
             showHiddenFolders.flatMapLatest { includeHidden ->
                 repository.folders(filter, latestCovers = fromSummaries, includeHidden = includeHidden)
             },
-            repository.mediaIn(FAVORITES_BUCKET_ID, filter).map<List<Medium>, List<Medium>?> { it }
-                .onStart { emit(null) },
+            repository.mediaIn(FAVORITES_BUCKET_ID, filter),
             if (fromSummaries) flowOf(emptyList()) else repository.mediaIn(RECENT_BUCKET_ID, filter)
                 .onStart { emit(emptyList()) },
         ) { folders, favorites, media ->
@@ -122,13 +121,13 @@ class FoldersViewModel @Inject constructor(
                 folders.filterNot { it.isLocked || it.isHidden }.recent()
                     ?.withAutomaticCover(media, config.sortingFor(RECENT_BUCKET_ID))
             } else null
-            FolderAlbums(covered, favorites?.asFavoritesFolder(config.sortingFor(FAVORITES_BUCKET_ID)), recent)
+            FolderAlbums(covered, favorites.asFavoritesFolder(config.sortingFor(FAVORITES_BUCKET_ID)), recent)
         }
     }.flowOn(Dispatchers.Default)
 
     private val orderedAlbums = combine(albums, settings.settings, dragOrder) {
         (folders, favorites, recent), config, draft ->
-        val autoSorted = listOfNotNull(favorites) + folders.sortedBy(config.sorting)
+        val autoSorted = listOf(favorites) + folders.sortedBy(config.sorting)
         val manualSort = draft != null || config.manualFolderSort
         val ordered = if (manualSort) {
             val positions = (draft?.order ?: config.folderOrder).withIndex().associate { it.value to it.index }
@@ -329,7 +328,7 @@ class FoldersViewModel @Inject constructor(
     }
 }
 
-private data class FolderAlbums(val folders: List<Folder>, val favorites: Folder?, val recent: Folder?)
+private data class FolderAlbums(val folders: List<Folder>, val favorites: Folder, val recent: Folder?)
 
 private fun Folder.withAutomaticCover(media: List<Medium>, sorting: Sorting): Folder =
     if (manualCover != null || media.isEmpty()) this

@@ -30,7 +30,7 @@ private class FolderAdapter : RecyclerView.Adapter<FolderHolder>() {
 
     init { setHasStableIds(true) }
     fun update(items: List<Folder>, config: FolderBinding) {
-        if (folders === items && ::binding.isInitialized && binding == config) return
+        if (::binding.isInitialized && binding == config && folders == items) return
         folders = items
         binding = config
         notifyDataSetChanged()

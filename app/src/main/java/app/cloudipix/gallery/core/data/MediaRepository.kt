@@ -144,12 +144,6 @@ class MediaRepository @Inject constructor(
         }
     }
     private val albumSources = visibleAlbums.combine(albumMirrors, ::Pair)
-    private val browsingAlbumSources = visibleAlbums.combine(
-        albumMirrors.map<AlbumMirrors, AlbumMirrors?> { it }
-            .onStart { emit(albumMirrors.replayCache.lastOrNull()) }
-            .distinctUntilChanged(),
-        ::Pair,
-    )
 
     /**
      * 기기와 서버의 휴지통을 합친 최근 순 목록입니다. 기기 휴지통은 저장소가 바뀔 때마다 다시 읽습니다.
@@ -162,9 +156,8 @@ class MediaRepository @Inject constructor(
         .withoutRemoving()
 
     fun folders(filter: MediaFilter, latestCovers: Boolean = false, includeHidden: Boolean = false): Flow<List<Folder>> {
-        val cloudFolders = combine(browsingAlbumSources, pinned.ids(), ignored.all(), covers.all()) { sources, pins, hidden, styles ->
-            val (albums, resolvedMirrors) = sources
-            val mirrors = resolvedMirrors ?: noAlbumMirrors
+        val cloudFolders = combine(albumSources, pinned.ids(), ignored.all(), covers.all()) { sources, pins, hidden, styles ->
+            val (albums, mirrors) = sources
             val pinnedIds = pins.toHashSet()
             val hiddenIds = hidden.mapTo(mutableSetOf()) { it.bucketId }
             val excluded = if (includeHidden) emptySet() else hiddenIds
@@ -190,14 +183,13 @@ class MediaRepository @Inject constructor(
                         ?: additions.firstOrNull { it.id == style?.photoId }?.toMedium(false)?.uri,
                 )
             }
-            BrowsingFolders(cloud, resolvedMirrors, pinnedIds, hiddenIds)
+            BrowsingFolders(cloud, mirrors, pinnedIds, hiddenIds)
         }
-        return cloudFolders.combine(media.folders(filter.types, includeHidden).onStart { emit(emptyList()) }) { cloud, rows ->
-            // The remote index is safe to display before local mirror identities have been resolved.
-            val folders = cloud.mirrors?.folders(
+        return cloudFolders.combine(media.folders(filter.types, includeHidden)) { cloud, rows ->
+            val folders = cloud.mirrors.folders(
                 rows.map { it.toFolder(it.bucketId in cloud.pinned) },
                 cloud.folders, if (includeHidden) emptySet() else cloud.hidden, cloud.pinned, filter,
-            ) ?: cloud.folders
+            )
             if (includeHidden) folders.map { if (it.bucketId in cloud.hidden) it.copy(isHidden = true) else it } else folders
         }.combine(lockedFolders) { folders, locked ->
             folders.map { if (it.bucketId in locked) it.copy(isLocked = true, automaticCover = null) else it }
@@ -206,7 +198,7 @@ class MediaRepository @Inject constructor(
 
     private data class BrowsingFolders(
         val folders: List<Folder>,
-        val mirrors: AlbumMirrors?,
+        val mirrors: AlbumMirrors,
         val pinned: Set<Long>,
         val hidden: Set<Long>,
     )

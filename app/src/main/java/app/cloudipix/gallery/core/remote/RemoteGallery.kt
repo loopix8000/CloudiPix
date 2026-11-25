@@ -17,6 +17,7 @@ import app.cloudipix.gallery.core.sync.SyncFileFilter
 import app.cloudipix.gallery.core.sync.filterForFolder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -76,6 +77,7 @@ class RemoteGallery @Inject internal constructor(
     private val lastFullRead = mutableMapOf<String, Long>()
     private val dirtyIndexes = mutableSetOf<String>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val cachedIndexesRead = CompletableDeferred<Unit>()
     private val registered = MutableStateFlow<List<RemoteServer>>(emptyList())
     private val snapshots = MutableStateFlow<Map<String, RemoteSnapshot>>(emptyMap())
     private val refreshing = MutableStateFlow<Set<String>>(emptySet())
@@ -83,7 +85,13 @@ class RemoteGallery @Inject internal constructor(
     @Volatile private var loaded = false
 
     init {
-        scope.launch { loadConnections() }
+        scope.launch {
+            try {
+                loadConnections()
+            } finally {
+                cachedIndexesRead.complete(Unit)
+            }
+        }
     }
 
     private suspend fun loadConnections(): Boolean = withContext(Dispatchers.IO) {
@@ -97,25 +105,25 @@ class RemoteGallery @Inject internal constructor(
             } catch (_: Exception) {
                 return@withLock false
             }
-            registered.value = servers
-            for (server in servers) {
-                collectAlbumUpdates(emptyList(), { albums ->
-                    snapshots.update { it + (server.id to RemoteSnapshot(albums)) }
-                }) { emit -> readIndex(server, emit) }
+            snapshots.value = servers.associate { server ->
+                server.id to RemoteSnapshot(readIndex(server))
             }
+            registered.value = servers
             loaded = true
+            cachedIndexesRead.complete(Unit)
             true
         }
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun readIndex(server: RemoteServer, emit: suspend (RemoteAlbum) -> Unit) {
+    private suspend fun readIndex(server: RemoteServer): List<RemoteAlbum> {
+        val albums = linkedMapOf<Long, RemoteAlbum>()
         val isVisible = albumVisibility(server)
         try {
             index(server.id).openRead().use { input ->
                 for (album in Json.decodeToSequence<RemoteAlbum>(input, DecodeSequenceMode.ARRAY_WRAPPED)) {
                     currentCoroutineContext().ensureActive()
-                    if (isVisible(album)) emit(album)
+                    if (isVisible(album)) albums[album.id] = album
                 }
             }
         } catch (_: FileNotFoundException) {
@@ -125,6 +133,7 @@ class RemoteGallery @Inject internal constructor(
         } catch (_: SerializationException) {
             dirtyIndexes += server.id
         }
+        return albums.values.toList()
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -166,6 +175,7 @@ class RemoteGallery @Inject internal constructor(
     }
 
     internal val fileFilters = store.fileFilters
+    // 저장된 색인을 모두 읽은 뒤 구독해 디스크 로딩 중의 빈 목록을 내보내지 않는다.
     private val visibleAlbumsByServer = combine(registered, snapshots, fileFilters) { servers, cached, settings ->
         servers.associate { server ->
             val overrides = settings.overridesFor(server.id)
@@ -174,7 +184,7 @@ class RemoteGallery @Inject internal constructor(
                 album.withFileFilter(overrides.filterForFolder(path, settings.global))
             }
         }
-    }.flowOn(Dispatchers.Default).distinctUntilChanged()
+    }.onStart { cachedIndexesRead.await() }.flowOn(Dispatchers.Default).distinctUntilChanged()
         .shareIn(scope, SharingStarted.WhileSubscribed(5_000, 0), replay = 1)
 
     internal val albums: Flow<List<RemoteAlbum>> = visibleAlbumsByServer.map { it.values.flatten() }
@@ -238,7 +248,7 @@ class RemoteGallery @Inject internal constructor(
         servers.flatMap { server ->
             server.connectedFolders(destinations(server, cached[server.id]?.albums.orEmpty()))
         }
-    }
+    }.onStart { cachedIndexesRead.await() }
 
     internal val folderFileFilters = combine(linkedFolders, fileFilters) { folders, settings ->
         buildMap {
@@ -786,7 +796,8 @@ class RemoteGallery @Inject internal constructor(
                 }
             }
         }
-        val result = if (affected == null) albums.values.toList() else cachedAlbums.keys.mapNotNull(albums::remove) + albums.values
+        // 기존 앨범의 순서를 유지해 정렬 기준이 같은 폴더가 갱신 완료 시 다시 움직이지 않게 한다.
+        val result = cachedAlbums.keys.mapNotNull(albums::remove) + albums.values
         return previous?.takeIf { it.unavailable == unavailable && it.albums == result } ?: RemoteSnapshot(result, unavailable)
     }
 
