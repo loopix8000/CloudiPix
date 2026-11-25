@@ -206,6 +206,8 @@ internal fun ViewerScreen(
     val density = LocalDensity.current
     val swipeThreshold = with(density) { SWIPE_THRESHOLD.toPx() }
     val scope = rememberCoroutineScope()
+    // 탐색 상태가 목록으로 바뀐 뒤에도 닫는 사진의 전체 구도를 유지한다.
+    val openingBitmap = remember(initialPreview) { initialBitmap }
 
     val metadataConsent = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
@@ -402,9 +404,10 @@ internal fun ViewerScreen(
                 val previewVisible = leaving || openingPhoto || pagerState == null || photoInMotion || waitingForInitialPhoto
                 PhotoTransitionPreview(
                     uri = sharedPhoto.uri,
-                    fullPreview = initialBitmap.takeIf { sharedPhoto.uri == initialPreview?.uri },
+                    fullPreview = openingBitmap.takeIf { sharedPhoto.uri == initialPreview?.uri },
                     modifier = photoTransition(sharedPhoto.id),
                     visible = previewVisible,
+                    closing = leaving,
                     boundsImage = boundsImage,
                     original = if (leaving) boundsImage else decoded,
                 )
@@ -483,7 +486,7 @@ internal fun ViewerScreen(
                         )
                     } else {
                         LocalViewerPhoto(
-                            uri, medium.dateModified, viewport, zoom, initialBitmap.takeIf { isInitialPhoto },
+                            uri, medium.dateModified, viewport, zoom, openingBitmap.takeIf { isInitialPhoto },
                             onDecoded = onOriginalDecoded,
                             onError = { medium.remoteUri?.let { cloud -> unreadableCopies[uri] = cloud } },
                             onClick = { chrome = !chrome },
@@ -603,6 +606,7 @@ private fun PhotoTransitionPreview(
     fullPreview: BitmapImage?,
     modifier: Modifier,
     visible: Boolean,
+    closing: Boolean,
     boundsImage: BitmapImage?,
     original: BitmapImage?,
 ) {
@@ -613,7 +617,6 @@ private fun PhotoTransitionPreview(
         }
     }
     val reference = boundsImage ?: fullPreview ?: thumbnail
-    // 사진의 전체 비율에서 목록 칸의 비율까지 이동하는 동안 가운데를 기준으로 자른다.
     val aspect = reference?.takeIf { it.width > 0 && it.height > 0 }?.let { it.width.toFloat() / it.height }
     val image = original?.takeIf {
         // 썸네일 치수의 반올림 오차를 허용하면서 전환 도중에는 같은 비율의 원본만 겹쳐 그린다.
@@ -623,12 +626,13 @@ private fun PhotoTransitionPreview(
     val bounds = if (aspect != null) Modifier.aspectRatio(aspect) else Modifier.fillMaxSize()
     Box(bounds.then(modifier)) {
         if (visible) {
-            val previewModifier = Modifier.fillMaxSize().background(GalleryTheme.colors.background)
+            val previewModifier = Modifier.fillMaxSize()
+                .then(if (closing) Modifier else Modifier.background(GalleryTheme.colors.background))
             if (image != null) {
                 Image(
                     painter = remember(context, image) { image.asPainter(context) },
                     contentDescription = null,
-                    contentScale = if (aspect != null) ContentScale.Crop else ContentScale.Fit,
+                    contentScale = if (closing || aspect == null) ContentScale.Fit else ContentScale.Crop,
                     modifier = previewModifier,
                 )
             } else {

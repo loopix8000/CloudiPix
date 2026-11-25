@@ -36,7 +36,6 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
@@ -146,7 +145,7 @@ data class Viewer(val bucketId: Long, val mediumId: Long, val previewUri: String
 
 private data class ViewerOpening(val route: Viewer, val medium: Medium, val bitmap: BitmapImage? = null)
 
-private data class ClosingPhoto(val id: Long, val originalOpacity: State<Float>)
+private data class ClosingPhoto(val id: Long, val thumbnailOpacity: State<Float>)
 
 @Serializable
 data class Editor(val mediumId: Long? = null, val bucketId: Long = RECENT_BUCKET_ID, val inputUri: String? = null)
@@ -544,11 +543,11 @@ private fun SharedTransitionScope.sharedPhoto(
         }
     }
     if (!inGrid) {
-        val opacity = if (state.isMatchFound) {
-            visibility.transition.animateFloat(
+        if (state.isMatchFound && !targetVisible) {
+            val opacity = visibility.transition.animateFloat(
                 transitionSpec = {
                     if (targetState == EnterExitState.PostExit) {
-                        // 칸까지 이동하는 시간을 확보한 뒤 원본을 서서히 지운다.
+                        // 칸까지 이동하는 데 걸리는 최대 시간이 지난 뒤 썸네일을 겹친다.
                         tween(
                             durationMillis = PHOTO_CLOSE_HANDOFF_MS,
                             delayMillis = PHOTO_CLOSE_MS + PHOTO_MAX_TRAVEL_MS,
@@ -556,10 +555,8 @@ private fun SharedTransitionScope.sharedPhoto(
                         )
                     } else snap()
                 },
-                label = "닫는 사진 투명도",
-            ) { if (it == EnterExitState.PostExit) 0f else 1f }
-        } else null
-        if (visibility.transition.targetState == EnterExitState.PostExit && opacity != null) {
+                label = "닫는 사진의 썸네일 투명도",
+            ) { if (it == EnterExitState.PostExit) 1f else 0f }
             DisposableEffect(id, opacity) {
                 val photo = ClosingPhoto(id, opacity)
                 closingPhoto.value = photo
@@ -577,20 +574,19 @@ private fun SharedTransitionScope.sharedPhoto(
             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
             zIndexInOverlay = 1f,
             clipInOverlayDuringTransition = clip,
-        ).graphicsLayer {
-            alpha = if (state.isMatchFound) opacity?.value ?: 1f else 1f
-        }
+        )
     }
     return Modifier.sharedElement(
         sharedContentState = state,
         animatedVisibilityScope = visibility,
         boundsTransform = boundsTransform,
+        zIndexInOverlay = if (targetVisible) 2f else 0f,
         clipInOverlayDuringTransition = clip,
-    ).drawWithContent {
-        // 원본이 흐려질 때 아래 썸네일을 불투명하게 그려 목록 배경이 비치는 것을 막는다.
-        val originalOpacity = closingPhoto.value?.takeIf { it.id == id }?.originalOpacity?.value ?: 1f
-        if (!state.isMatchFound || !isTransitionActive || (targetVisible && originalOpacity < 1f)) {
-            drawContent()
+    ).graphicsLayer {
+        alpha = when {
+            !state.isMatchFound || !isTransitionActive -> 1f
+            targetVisible -> closingPhoto.value?.takeIf { it.id == id }?.thumbnailOpacity?.value ?: 0f
+            else -> 0f
         }
     }
 }
