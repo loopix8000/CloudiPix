@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag, such as v0.1.1
+        description: Existing release tag, such as v0.1.2
         type: string
         required: true
 
@@ -26,7 +26,7 @@ jobs:
       - name: Check release tag format
         run: |
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo 'Expected a release tag such as v0.1.1.' >&2
+            echo 'Expected a release tag such as v0.1.2.' >&2
             exit 1
           fi
 
@@ -72,7 +72,7 @@ jobs:
           apk_dir=app/build/outputs/apk/release
           metadata="$apk_dir/output-metadata.json"
           jq -e --arg version "${RELEASE_TAG#v}" '
-            .applicationId == "app.cloudipix.gallery.release" and
+            .applicationId == "app.cloudipix.gallery.official" and
             (.elements | length == 1) and .elements[0].versionName == $version
           ' "$metadata" >/dev/null || { echo 'APK metadata does not match the release tag.' >&2; exit 1; }
           unsigned_apk="$apk_dir/$(jq -er '.elements[0].outputFile' "$metadata")"
@@ -88,7 +88,7 @@ jobs:
             --out "$RUNNER_TEMP/CloudiPix.apk" "$RUNNER_TEMP/aligned.apk"
 
           verification=$("$ANDROID_BUILD_TOOLS/apksigner" verify --print-certs "$RUNNER_TEMP/CloudiPix.apk")
-          if ! grep -Fxq 'Signer #1 certificate SHA-256 digest: 4f9979a12b57910dcb6dd2b88b3f14b170d6d702e0986c775e6af6da94c01d77' <<< "$verification"; then
+          if ! grep -Fxq 'Signer #1 certificate SHA-256 digest: 5df178d6f36123fa9c52b0020b8f2e1ba64d9506316689b32d5ab9819a0bc28d' <<< "$verification"; then
             echo 'The APK was not signed with the CloudiPix release key.' >&2
             exit 1
           fi
