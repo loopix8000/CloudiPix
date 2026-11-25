@@ -24,11 +24,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import app.cloudipix.gallery.R
 import app.cloudipix.gallery.core.media.StorageRoot
@@ -100,7 +105,12 @@ internal fun FolderBrowser(
             modifier = Modifier.padding(horizontal = Spacing.screen).padding(bottom = 8.dp),
         )
         key(path) {
-            LazyColumn(Modifier.height((LocalConfiguration.current.screenHeightDp * 0.55f).dp).fillMaxWidth()) {
+            LazyColumn(
+                Modifier
+                    .height((LocalConfiguration.current.screenHeightDp * 0.55f).dp)
+                    .fillMaxWidth()
+                    .nestedScroll(FolderListScrollConnection),
+            ) {
                 if (path == null) {
                     items(roots, key = StorageRoot::id) { storage ->
                         BrowserRow(storagePathLabel(storage.path), GalleryIcons.Folder) { browse(storage.path) }
@@ -159,6 +169,15 @@ internal fun FolderBrowser(
 }
 
 private data class OpenedFolder(val path: String, val folders: List<File>)
+
+// 목록이 맨 위에 닿은 뒤 남은 아래 방향 스크롤이 탐색창을 닫지 않도록 소비한다.
+private object FolderListScrollConnection : NestedScrollConnection {
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
+        Offset(0f, available.y.coerceAtLeast(0f))
+
+    override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity =
+        Velocity(0f, available.y.coerceAtLeast(0f))
+}
 
 private suspend fun listFolders(path: String, isRoot: Boolean, excluded: String?): Result<List<File>> = withContext(Dispatchers.IO) {
     runCatching {
