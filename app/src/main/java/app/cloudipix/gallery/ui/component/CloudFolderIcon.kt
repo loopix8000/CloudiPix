@@ -47,6 +47,9 @@ private val CloudCheckPath = PathParser()
     .toPath()
     .asAndroidPath()
 
+// 흰 배경 썸네일에서도 윤곽이 보이도록 회색빛이 살짝 도는 흰색을 불투명도 80%로 쓴다.
+internal const val CLOUD_ICON_ARGB = 0xCCDCDDE1.toInt()
+
 internal fun cloudFolderGlyph(syncState: AlbumSyncState?) = when (syncState) {
     AlbumSyncState.Syncing -> CloudSyncPath to R.string.sync_notification_title
     AlbumSyncState.Complete -> CloudCheckPath to R.string.sync_completed
@@ -81,7 +84,7 @@ internal fun CloudFolderIcon(
                     strokeWidth = size.minDimension * (2f / 24f)
                     strokeCap = Paint.Cap.ROUND
                     strokeJoin = Paint.Join.ROUND
-                    color = Color.White.copy(alpha = 0.70f).toArgb()
+                    color = CLOUD_ICON_ARGB
                     setShadowLayer(1.25.dp.toPx(), 0f, 0.75.dp.toPx(), Color.Black.copy(alpha = 0.4f).toArgb())
                 }
                 onDrawBehind { drawIntoCanvas { it.nativeCanvas.drawPath(path, paint) } }

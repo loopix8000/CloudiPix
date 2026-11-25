@@ -1,6 +1,7 @@
 package app.cloudipix.gallery
 
 import android.Manifest
+import android.app.ActivityOptions
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
@@ -8,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.WindowManager
 import app.cloudipix.gallery.core.settings.storedLanguage
@@ -63,8 +65,8 @@ class MainActivity : GalleryActivity() {
 class AlbumActivity : GalleryActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 여는 전환은 시작 요청의 ActivityOptions로 넘긴다. 뒤로 가기와 예측 뒤로 가기에 쓸 닫는 전환만 여기서 정한다.
         if (Build.VERSION.SDK_INT >= 34) {
-            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, R.anim.album_enter, R.anim.folders_recede)
             overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, R.anim.folders_return, R.anim.album_exit)
         }
     }
@@ -86,6 +88,11 @@ abstract class GalleryActivity : ComponentActivity() {
     private lateinit var unlockSession: GalleryUnlockSession
     private lateinit var access: GalleryAccess
     private var openingAlbum = false
+    // 창이 나타나는 전환 도중에 다른 액티비티를 열면 시스템이 두 전환을 합쳐 앨범 슬라이드가 생략될 수 있다.
+    private var windowEntering = true
+    private var windowShownAt = SystemClock.uptimeMillis()
+    private var pendingAlbum: Media? = null
+    private val startPendingAlbum = Runnable { pendingAlbum?.let(::startAlbum) }
     private val navigationVolumeKeys = mutableSetOf<Int>()
     private var repeatingVolumeKey: Int? = null
     private var volumeRepeat: Job? = null
@@ -140,12 +147,33 @@ abstract class GalleryActivity : ComponentActivity() {
         unlockSession.windowStarted()
     }
 
+    override fun onRestart() {
+        super.onRestart()
+        windowEntering = true
+        windowShownAt = SystemClock.uptimeMillis()
+    }
+
+    override fun onEnterAnimationComplete() {
+        super.onEnterAnimationComplete()
+        windowEntering = false
+        if (pendingAlbum != null) {
+            window.decorView.removeCallbacks(startPendingAlbum)
+            startPendingAlbum.run()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         openingAlbum = false
     }
 
     override fun onStop() {
+        // 화면을 떠나면 미뤄 둔 앨범을 열지 않는다. 돌아와서 다시 누를 수 있도록 잠금도 푼다.
+        if (pendingAlbum != null) {
+            window.decorView.removeCallbacks(startPendingAlbum)
+            pendingAlbum = null
+            openingAlbum = false
+        }
         access.dispose()
         unlockSession.windowStopped(isChangingConfigurations)
         super.onStop()
@@ -241,20 +269,34 @@ abstract class GalleryActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
     }
 
-    @Suppress("DEPRECATION")
     private fun openAlbum(route: Media) {
         if (openingAlbum) return
         openingAlbum = true
-        startActivity(Intent(this, AlbumActivity::class.java).apply {
+        // 앱을 연 직후라면 창이 나타나는 전환이 끝난 뒤에 연다. 완료 알림이 오지 않아도 정해진 시간 안에는 연다.
+        val wait = if (windowEntering) windowShownAt + MAX_ENTER_WAIT_MS - SystemClock.uptimeMillis() else 0L
+        if (wait <= 0L) {
+            startAlbum(route)
+        } else {
+            pendingAlbum = route
+            window.decorView.postDelayed(startPendingAlbum, wait)
+        }
+    }
+
+    private fun startAlbum(route: Media) {
+        pendingAlbum = null
+        val intent = Intent(this, AlbumActivity::class.java).apply {
             putExtra(BUCKET_ID, route.bucketId)
             putExtra(ALBUM_TITLE, route.title)
             putExtra(CHOOSE_COVER, route.chooseCover)
             putExtra(SESSION_KEY, sessionKey)
-        })
-        if (Build.VERSION.SDK_INT < 34) overridePendingTransition(R.anim.album_enter, R.anim.folders_recede)
+        }
+        // 전환을 시작 요청에 직접 붙여 새 액티비티가 준비되는 시점과 관계없이 슬라이드가 적용되게 한다.
+        val transition = ActivityOptions.makeCustomAnimation(this, R.anim.album_enter, R.anim.folders_recede)
+        startActivity(intent, transition.toBundle())
     }
 }
 
+private const val MAX_ENTER_WAIT_MS = 800L
 private const val SESSION_KEY = "galleryWindowSession"
 private const val BUCKET_ID = "albumBucketId"
 private const val ALBUM_TITLE = "albumTitle"

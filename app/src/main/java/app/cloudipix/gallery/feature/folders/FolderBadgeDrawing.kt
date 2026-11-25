@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.graphics.vector.toPath
 import androidx.core.graphics.withSave
+import app.cloudipix.gallery.ui.component.CLOUD_ICON_ARGB
 import app.cloudipix.gallery.ui.component.GalleryIcons
 import app.cloudipix.gallery.ui.theme.FavoriteRed
 
@@ -52,7 +53,7 @@ internal fun Canvas.drawFolderBadges(
             edge, FavoriteRed.toArgb(), filled = true)
     }
     if (state.locked) glyph(lock, (width - 22f) / 2, (width - 22f) / 2, 22f, 0xd1ffffff.toInt())
-    state.cloud?.let { glyph(it, start(if (state.selecting) 28f else 6f, 12f), 6f, 12f, 0xb3ffffff.toInt(), viewport = 24f) }
+    state.cloud?.let { glyph(it, start(if (state.selecting) 28f else 6f, 12f), 6f, 12f, CLOUD_ICON_ARGB, viewport = 24f) }
     fun statusBadge(path: Path, top: Float) {
         val x = end(5f, 20f)
         circle(x + 10f, top + 10f, 10f, 0x8c000000.toInt())

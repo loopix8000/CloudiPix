@@ -13,7 +13,6 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
@@ -38,18 +37,20 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavBackStackEntry
@@ -157,8 +158,11 @@ private const val PHOTO_MAX_OPEN_MS = 250
 private const val PHOTO_CLOSE_MS = 190
 private const val PHOTO_MAX_TRAVEL_MS = 40
 private const val PHOTO_CLOSE_HANDOFF_MS = 50
+// 설정 전환은 앨범 액티비티 전환(res/anim/album_*.xml, folders_*.xml)과 같은 시간·곡선·밀림·어둡기를 쓴다.
 private const val SETTINGS_SLIDE_MS = 300
-private const val SETTINGS_PARALLAX_DIVISOR = 4
+private const val SETTINGS_RECEDE_FRACTION = 0.16f
+private const val SETTINGS_RECEDE_ALPHA = 0.65f
+private val settingsSlideEasing = CubicBezierEasing(0.35f, 0f, 0.25f, 1f)
 // 열 때와 닫을 때 모두 바로 움직이기 시작해 도착 지점에서 감속한다.
 // 닫을 때 가속 곡선을 쓰면 처음에는 뷰어 배경만 보이다가 마지막 두세 프레임에 사진이 칸으로 순간 이동해 끊겨 보인다.
 private val photoOpenEasing = CubicBezierEasing(0.30f, 0.54f, 0.52f, 1f)
@@ -243,18 +247,26 @@ fun GalleryNavHost(
     }
     val visibleEntries by navController.visibleEntries.collectAsState()
     val folderState = rememberSaveableStateHolder()
+    // 폴더 화면과 설정 화면이 함께 전환 중일 때만 폴더 화면을 밀어낸다. 검색·휴지통 전환에는 영향을 주지 않는다.
+    val settingsInMotion = rememberUpdatedState(visibleEntries.any { it.destination.isSettingsDestination() })
+    val folderRecede = remember { mutableStateOf<State<Float>?>(null) }
+    val layoutDirection = LocalLayoutDirection.current
     Box(Modifier.fillMaxSize()) {
         // 폴더는 별도 앨범 액티비티를 연다. 사진 전환의 예측 배치에 폴더 그리드까지 참여시키지 않는다.
         visibleEntries.lastOrNull { it.destination.hasRoute<Folders>() }?.let { entry ->
             entry.LocalOwnersProvider(folderState) {
-                FoldersScreen(
-                    onOpenFolder = { openAlbum(Media(it.bucketId, it.name)) },
-                    onChooseCover = { openAlbum(Media(it.bucketId, it.name, chooseCover = true)) },
-                    onOpenSearch = { openSearch() },
-                    onOpenSettings = { openSettings() },
-                    onOpenTrash = { navController.navigate(Trash) },
-                    requestLocalAccess = requestLocalAccess,
-                )
+                Box(Modifier.fillMaxSize().recedeBehindSettings(layoutDirection) {
+                    if (settingsInMotion.value) folderRecede.value?.value ?: 0f else 0f
+                }) {
+                    FoldersScreen(
+                        onOpenFolder = { openAlbum(Media(it.bucketId, it.name)) },
+                        onChooseCover = { openAlbum(Media(it.bucketId, it.name, chooseCover = true)) },
+                        onOpenSearch = { openSearch() },
+                        onOpenSettings = { openSettings() },
+                        onOpenTrash = { navController.navigate(Trash) },
+                        requestLocalAccess = requestLocalAccess,
+                    )
+                }
             }
         }
         SharedTransitionLayout(Modifier.fillMaxSize().onGloballyPositioned { sceneCoordinates = it }) {
@@ -262,7 +274,25 @@ fun GalleryNavHost(
             val graph: NavGraphBuilder.() -> Unit = {
                 // 폴더 화면은 위에서 따로 그린다. 컨테이너 기준 슬라이드 거리가 도착 화면 크기를 따르므로
                 // 설정이 닫힐 때도 끝까지 밀려 나가도록 빈 화면을 전체 크기로 둔다.
-                composable<Folders> { Box(Modifier.fillMaxSize()) }
+                composable<Folders> {
+                    // 폴더 화면의 밀림 정도를 이 항목의 전환에 묶어 설정 화면의 슬라이드와 같은 프레임에 움직인다.
+                    // 설정과 무관한 전환은 즉시 끝내 검색·휴지통 화면이 열리는 시간을 늘리지 않는다.
+                    val recede = transition.animateFloat(
+                        transitionSpec = {
+                            // 열 때는 이미 바뀐 현재 항목으로, 돌아올 때는 아직 보이는 설정 항목으로 판단한다.
+                            val settingsOnTop = if (targetState == EnterExitState.PostExit) {
+                                navController.currentBackStackEntry?.destination?.isSettingsDestination() == true
+                            } else settingsInMotion.value
+                            if (settingsOnTop) tween(SETTINGS_SLIDE_MS, easing = settingsSlideEasing) else snap()
+                        },
+                        label = "설정 뒤로 밀리는 폴더 화면",
+                    ) { if (it == EnterExitState.Visible) 0f else 1f }
+                    DisposableEffect(recede) {
+                        folderRecede.value = recede
+                        onDispose { if (folderRecede.value === recede) folderRecede.value = null }
+                    }
+                    Box(Modifier.fillMaxSize())
+                }
                 composable<Media> { entry ->
                     val visibility = this
                     val bucketId = entry.toRoute<Media>().bucketId
@@ -461,18 +491,28 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.settingsSlideIn():
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.settingsSlideOut(): ExitTransition =
     slideOutOfContainer(SlideDirection.End, settingsSlideSpec())
 
-// 아래에 남는 설정 화면은 조금만 밀려나 깊이감을 준다. 설정 밖 화면은 제자리에 둔다.
+// 아래에 남는 화면은 앨범을 열 때의 폴더 화면처럼 조금 밀려나며 검은 배경 위에서 어두워진다.
+// 폴더 화면은 NavHost 밖에서 그리므로 같은 효과를 recedeBehindSettings로 따로 준다.
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.settingsSlideAside(): ExitTransition =
-    if (initialState.destination.isSettingsDestination()) {
-        slideOutOfContainer(SlideDirection.Start, settingsSlideSpec()) { it / SETTINGS_PARALLAX_DIVISOR }
-    } else ExitTransition.KeepUntilTransitionsFinished
+    slideOutOfContainer(SlideDirection.Start, settingsSlideSpec()) { (it * SETTINGS_RECEDE_FRACTION).roundToInt() } +
+        fadeOut(settingsSlideSpec(), targetAlpha = SETTINGS_RECEDE_ALPHA)
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.settingsSlideBack(): EnterTransition =
-    if (targetState.destination.isSettingsDestination()) {
-        slideIntoContainer(SlideDirection.End, settingsSlideSpec()) { it / SETTINGS_PARALLAX_DIVISOR }
-    } else EnterTransition.None
+    slideIntoContainer(SlideDirection.End, settingsSlideSpec()) { (it * SETTINGS_RECEDE_FRACTION).roundToInt() } +
+        fadeIn(settingsSlideSpec(), initialAlpha = SETTINGS_RECEDE_ALPHA)
 
-private fun settingsSlideSpec() = tween<IntOffset>(SETTINGS_SLIDE_MS, easing = FastOutSlowInEasing)
+private fun <T> settingsSlideSpec() = tween<T>(SETTINGS_SLIDE_MS, easing = settingsSlideEasing)
+
+// progress가 0이면 제자리, 1이면 설정 아래로 완전히 밀려난 상태다. 어두워지는 정도는 검은 배경 위의 투명도와 같다.
+private fun Modifier.recedeBehindSettings(layoutDirection: LayoutDirection, progress: () -> Float): Modifier =
+    graphicsLayer {
+        val direction = if (layoutDirection == LayoutDirection.Rtl) 1f else -1f
+        translationX = direction * size.width * SETTINGS_RECEDE_FRACTION * progress()
+    }.drawWithContent {
+        drawContent()
+        val fraction = progress()
+        if (fraction > 0f) drawRect(Color.Black, alpha = (1f - SETTINGS_RECEDE_ALPHA) * fraction)
+    }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.photoEnter(): EnterTransition =
     if (isPhotoTransition() && targetState.destination.hasRoute<Viewer>()) {
