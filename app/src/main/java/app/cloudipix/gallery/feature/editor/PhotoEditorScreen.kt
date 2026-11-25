@@ -139,9 +139,11 @@ fun PhotoEditorScreen(onBack: () -> Unit, viewModel: PhotoEditorViewModel = hilt
         textTarget = at
     }
 
+    fun hasCropChanges() = ratio != FrameRatio.Free || cropper.canUndo
+
     fun applyFrame(transform: (PhotoEdit) -> PhotoEdit = { it }) {
         cropper.endTransformation()
-        val hasCrop = ratio != FrameRatio.Free || cropper.canUndo
+        val hasCrop = hasCropChanges()
         viewModel.beginGesture()
         viewModel.change { edit ->
             val rect = if (hasCrop && !state.previewIsDraft && state.previewEdit == edit.withoutAnnotations()) {
@@ -164,19 +166,23 @@ fun PhotoEditorScreen(onBack: () -> Unit, viewModel: PhotoEditorViewModel = hilt
         if (next == EditorPanel.Filters) viewModel.loadThumbnails()
     }
 
-    fun close() {
-        when {
-            state.saving -> Unit
-            cropping -> {
-                panel = null
-                viewModel.cancelGesture()
-            }
-            state.edit != PhotoEdit() -> confirmClose = true
-            else -> onBack()
+    fun cancelCrop() {
+        if (state.saving) return
+        panel = null
+        viewModel.cancelGesture()
+    }
+
+    fun closeEditor() {
+        if (state.saving) return
+        if (cropping) cropper.endTransformation()
+        if (state.edit != PhotoEdit() || (cropping && hasCropChanges())) {
+            confirmClose = true
+        } else {
+            onBack()
         }
     }
 
-    BackHandler(onBack = ::close)
+    BackHandler(onBack = ::closeEditor)
     LaunchedEffect(state.notice) {
         val notice = state.notice ?: return@LaunchedEffect
         Toast.makeText(context, notice, Toast.LENGTH_SHORT).show()
@@ -189,7 +195,7 @@ fun PhotoEditorScreen(onBack: () -> Unit, viewModel: PhotoEditorViewModel = hilt
             Modifier.fillMaxWidth().height(54.dp).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            EditorAction(GalleryIcons.Close, R.string.action_close, ::close, enabled = !state.saving)
+            EditorAction(GalleryIcons.Close, R.string.action_close, ::closeEditor, enabled = !state.saving)
             Spacer(Modifier.weight(1f))
             val canCompare = !cropping && !state.saving && state.edit != PhotoEdit()
             IconToggleButton(checked = comparing, onCheckedChange = { comparing = it }, enabled = canCompare,
@@ -309,7 +315,7 @@ fun PhotoEditorScreen(onBack: () -> Unit, viewModel: PhotoEditorViewModel = hilt
                         applyFrame(PhotoEdit::mirror)
                         ratio = FrameRatio.Free
                     },
-                    onCancel = ::close,
+                    onCancel = ::cancelCrop,
                     onDone = { showPanel(null) },
                 )
                 EditorPanel.Adjust -> AdjustControls(
