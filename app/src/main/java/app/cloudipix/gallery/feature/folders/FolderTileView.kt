@@ -189,7 +189,7 @@ internal class FolderTileView(context: Context) : ViewGroup(context) {
         if (next == null) return
         image.scaleType = if (crop) ImageView.ScaleType.CENTER_CROP else ImageView.ScaleType.FIT_CENTER
         val builder = ImageRequest.Builder(context).data(Thumbnail(next)).target(image)
-            .size(size, size).scale(if (crop) Scale.FILL else Scale.FIT).precision(Precision.INEXACT).crossfade(false)
+            .size(size, size).scale(if (crop) Scale.FILL else Scale.FIT).precision(Precision.EXACT).crossfade(false)
         if (locked) builder.transformations(CoverBlur) else builder.placeholderMemoryCacheKey(next.toString())
         if (placeholder != null) builder.placeholder(placeholder).error(placeholder)
         request = SingletonImageLoader.get(context).enqueue(builder.build())

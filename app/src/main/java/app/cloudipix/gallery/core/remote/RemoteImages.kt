@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import app.cloudipix.gallery.core.cache.MEBIBYTE
+import app.cloudipix.gallery.core.media.FileRangeReader
 import app.cloudipix.gallery.core.media.RangeReader
 import app.cloudipix.gallery.core.media.ThumbnailStorage
 import app.cloudipix.gallery.core.media.ThumbnailTarget
@@ -58,15 +59,18 @@ class RemoteImages @Inject constructor(
 
     /**
      * 고화질 썸네일을 받는 동안 먼저 보여 줄 내장 썸네일. 파일에서 썸네일이 있는 부분만 받아 꺼낸다.
-     * 화면에 잠깐 보여 주는 용도라 캐시하지 않는다.
-     * 고화질 썸네일이나 원본이 이미 있으면 고화질 썸네일이 금방 준비되므로 받지 않는다.
+     * 앞뒤 페이지를 미리 읽을 때는 디스크에 있는 썸네일도 작은 크기로 재사용한다.
      */
-    internal suspend fun embeddedThumbnail(uri: Uri, target: ThumbnailTarget): Bitmap = withContext(Dispatchers.IO) {
+    internal suspend fun embeddedThumbnail(uri: Uri, target: ThumbnailTarget, useCachedPreview: Boolean): Bitmap = withContext(Dispatchers.IO) {
+        thumbnails.readQuickPreview("$uri$PREVIEW_KEY_SUFFIX", target, useCachedPreview)?.let { return@withContext it }
         val (server, photo) = gallery.source(uri) ?: throw IOException()
         val format = embeddedFormat(photo.mimeType, photo.name)?.takeIf { photo.type == MediaType.Image }
             ?: throw IOException("내장 썸네일이 없는 형식입니다.")
-        if (thumbnails.has("$uri$PREVIEW_KEY_SUFFIX", target) || cache.contains(uri.toString())) {
-            throw IOException("고화질 썸네일을 바로 만들 수 있습니다.")
+        cache.open(uri.toString())?.use { original ->
+            if (!useCachedPreview) throw IOException("고화질 썸네일을 바로 만들 수 있습니다.")
+            return@withContext original.file().toFile().inputStream().use { input ->
+                readEmbeddedThumbnail(format, FileRangeReader(input.channel), target)
+            } ?: throw IOException("내장 썸네일이 없습니다.")
         }
         val reader = RangeReader { offset, length -> transport.readRange(server, photo.path, offset, length) }
         embeddedTransfers.withPermit { readEmbeddedThumbnail(format, reader, target.stored()) }

@@ -42,10 +42,10 @@ private const val DEFAULT_EDGE_PX = 512
  * 격자 썸네일 요청입니다. Coil은 이 값을 [ThumbnailFetcher]로 불러오고,
  * 메모리 캐시 키는 URI 문자열입니다([ThumbnailKeyer]).
  *
- * [embedded]이면 고화질 썸네일이 준비되기 전에 잠깐 보여 줄 내장 썸네일을 요청합니다. 캐시하지 않습니다.
- * 고화질 썸네일이 이미 디스크에 있거나 빠르게 보여 줄 썸네일이 없으면 실패합니다.
+ * [embedded]이면 고화질 썸네일이 준비되기 전에 보여 줄 작은 미리보기를 요청합니다.
+ * [useCachedPreview]이면 디스크에 있는 썸네일도 작은 크기로 읽어 격자의 미리보기 버퍼에 쓸 수 있습니다.
  */
-data class Thumbnail(val uri: Uri, val embedded: Boolean = false) {
+data class Thumbnail(val uri: Uri, val embedded: Boolean = false, val useCachedPreview: Boolean = false) {
     /** 정사각형으로 자르지 않은 전체 구도 미리보기의 메모리 캐시 키입니다. */
     val uncroppedKey: MemoryCache.Key get() = MemoryCache.Key("uncropped-thumbnail:$uri")
 }
@@ -120,12 +120,12 @@ class ThumbnailFetcher internal constructor(
      * 형식이면 시스템 썸네일을 씁니다. 동영상은 고화질 썸네일도 시스템 썸네일이라 따로 만들지 않습니다.
      */
     private suspend fun fetchEmbedded(): Bitmap {
-        if (data.uri.scheme == REMOTE_MEDIA_SCHEME) return remoteImages.embeddedThumbnail(data.uri, target)
+        if (data.uri.scheme == REMOTE_MEDIA_SCHEME) return remoteImages.embeddedThumbnail(data.uri, target, data.useCachedPreview)
         return withContext(embeddedThumbnailDispatcher) {
             val resolver = context.contentResolver
             val mimeType = resolver.getType(data.uri)
             if (mimeType?.startsWith("video/") == true) throw IOException("동영상은 시스템 썸네일을 바로 씁니다.")
-            if (thumbnails.has(cacheKey(), target)) throw IOException("고화질 썸네일이 이미 있습니다.")
+            thumbnails.readQuickPreview(cacheKey(), target, data.useCachedPreview)?.let { return@withContext it }
             val embedded = embeddedFormat(mimeType, data.uri.lastPathSegment)?.let { format ->
                 try {
                     resolver.openFileDescriptor(data.uri, "r")?.let { ParcelFileDescriptor.AutoCloseInputStream(it) }?.use { input ->

@@ -121,6 +121,7 @@ fun MediaScreen(
     BackHandler(enabled = state.selecting, onBack = viewModel::clearSelection)
 
     val gridState = rememberLazyGridState()
+    val thumbnails = rememberAlbumThumbnails(gridState, items, if (state.choosingCover && state.loaded) 1 else 0)
     var scrolledFor by rememberSaveable { mutableStateOf<ScrollDirection?>(null) }
     val gap = settings.thumbnailSpacing.gap
     val gapPx = with(LocalDensity.current) { gap.roundToPx() }
@@ -256,6 +257,7 @@ fun MediaScreen(
                             val sharedPhoto = medium.type != MediaType.Video && !state.choosingCover && !state.selecting
                             MediaTile(
                                 medium = medium,
+                                thumbnails = thumbnails,
                                 selected = medium.id in state.selected,
                                 selecting = state.selecting,
                                 showDuration = settings.showVideoDuration,
@@ -414,6 +416,7 @@ private val BadgeContent = Color(0xFFEDEDEF)
 @Composable
 internal fun MediaTile(
     medium: Medium,
+    thumbnails: AlbumThumbnails,
     selected: Boolean,
     selecting: Boolean,
     showDuration: Boolean,
@@ -431,11 +434,15 @@ internal fun MediaTile(
         }
     Box(cell) {
         val inset = if (selected) Modifier.padding(SelectedInset) else Modifier
+        val uri = medium.displayUri
         MediaThumbnail(
-            model = medium.displayUri,
+            model = uri,
             modifier = Modifier.fillMaxSize().then(inset).then(thumbnailModifier),
             description = medium.name,
-            quickPreview = medium.type != MediaType.Video,
+            quickPreview = false,
+            bufferedPreview = thumbnails.previews[uri],
+            loadFull = uri in thumbnails.full,
+            onFullFinished = { thumbnails.finish(uri) },
         )
         val knownLength = medium.durationMs > 0
         // 길이를 모르는 동영상(서버 동영상)은 설정과 관계없이 동영상임을 표시합니다.

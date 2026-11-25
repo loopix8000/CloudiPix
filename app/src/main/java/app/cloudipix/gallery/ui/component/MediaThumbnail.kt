@@ -15,7 +15,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import app.cloudipix.gallery.core.media.CoverBlur
 import app.cloudipix.gallery.core.media.Thumbnail
 import app.cloudipix.gallery.core.remote.REMOTE_MEDIA_SCHEME
@@ -30,6 +33,7 @@ import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.transformations
+import coil3.size.Precision
 
 /**
  * 격자 타일의 썸네일입니다. [coverPixels]를 주면 그 크기로 불러오고, [blurred]이면 흐리게 처리합니다.
@@ -49,11 +53,13 @@ fun MediaThumbnail(
     blurred: Boolean = false,
     coverPixels: Int? = null,
     quickPreview: Boolean = true,
+    bufferedPreview: ImageBitmap? = null,
+    loadFull: Boolean = true,
+    onFullFinished: (() -> Unit)? = null,
 ) {
     val context = LocalPlatformContext.current
     val radius = GalleryTheme.corners.radius
     val shape = remember(radius) { RoundedCornerShape(radius) }
-    val tile = modifier.aspectRatio(aspectRatio).clip(shape).background(GalleryTheme.colors.surface)
 
     // 원격 사진은 서버와 사진 ID가 같으면 같은 사진으로 봅니다.
     val remoteIdentity = model?.takeIf { it.scheme == REMOTE_MEDIA_SCHEME }?.let { uri ->
@@ -65,7 +71,7 @@ fun MediaThumbnail(
 
     val request = remember(context, model, blurred, coverPixels) {
         model?.let { uri ->
-            val builder = ImageRequest.Builder(context).data(Thumbnail(uri)).crossfade(false)
+            val builder = ImageRequest.Builder(context).data(Thumbnail(uri)).precision(Precision.EXACT).crossfade(false)
             coverPixels?.let { builder.size(it, it) }
             if (blurred) builder.transformations(CoverBlur) else builder.placeholderMemoryCacheKey(uri.toString())
             if (lastShown != null) {
@@ -78,7 +84,7 @@ fun MediaThumbnail(
 
     // 고화질 썸네일이 메모리에 없으면 그동안 내장 썸네일을 아래에 깔아 둡니다. 잠깐 보여 주는 용도라 캐시하지 않습니다.
     // 고화질 썸네일을 보여 주면 내장 썸네일은 내려놓고, 고화질 썸네일을 받지 못하면 계속 보여 줍니다.
-    var fullShown by remember(model, blurred) { mutableStateOf(false) }
+    var fullShown by remember(model, blurred, loadFull) { mutableStateOf(false) }
     val embeddedRequest = remember(context, model, blurred, coverPixels, quickPreview) {
         model?.takeIf { quickPreview && !blurred && SingletonImageLoader.get(context).memoryCache?.get(MemoryCache.Key(it.toString())) == null }
             ?.let { uri ->
@@ -91,18 +97,32 @@ fun MediaThumbnail(
             }
     }
     val contentScale = if (crop) ContentScale.Crop else ContentScale.Fit
+    var embeddedShown by remember(embeddedRequest) { mutableStateOf(false) }
+    val showPlaceholder = model != null && !fullShown && !embeddedShown &&
+        (bufferedPreview == null || blurred) && lastShown?.value == null
+    val colors = GalleryTheme.colors
+    val tile = modifier.aspectRatio(aspectRatio).clip(shape)
+        .background(if (showPlaceholder) colors.hairline else colors.surface)
 
     key(blurred) {
-        Box(tile) {
-            if (embeddedRequest != null && !fullShown) {
+        Box(if (!loadFull && description != null) tile.semantics { contentDescription = description } else tile) {
+            if (bufferedPreview != null && !blurred && !fullShown) {
+                androidx.compose.foundation.Image(
+                    bitmap = bufferedPreview,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = contentScale,
+                )
+            } else if (embeddedRequest != null && !fullShown) {
                 AsyncImage(
                     model = embeddedRequest,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = contentScale,
+                    onState = { embeddedShown = it.painter != null },
                 )
             }
-            AsyncImage(
+            if (loadFull) AsyncImage(
                 model = request,
                 contentDescription = description,
                 modifier = Modifier.fillMaxSize(),
@@ -111,7 +131,8 @@ fun MediaThumbnail(
                     if (state is AsyncImagePainter.State.Success) {
                         fullShown = true
                         lastShown?.value = state.result.image
-                    }
+                        onFullFinished?.invoke()
+                    } else if (state is AsyncImagePainter.State.Error) onFullFinished?.invoke()
                 },
             )
         }

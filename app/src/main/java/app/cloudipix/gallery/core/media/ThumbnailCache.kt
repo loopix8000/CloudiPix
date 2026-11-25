@@ -11,7 +11,6 @@ import app.cloudipix.gallery.core.settings.SettingsRepository
 import coil3.disk.DiskCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -115,27 +114,30 @@ internal class ThumbnailCache(private val disk: LimitedDiskCache) {
         }
     }
 
-    /** [key]에 [target]을 덮는 미리보기가 디스크에 있는지 이미지를 디코딩하지 않고 본다. */
-    suspend fun has(key: String?, target: ThumbnailTarget): Boolean {
-        if (key == null) return false
-        val stored = target.stored()
-        return withContext(Dispatchers.IO) { disk.use { it.hasPreview(key, stored) } }
+    /** 같은 칸의 고화질 요청이 이미 진행 중이면 현재 디스크 캐시를 두 번 디코딩하지 않는다. */
+    suspend fun readQuickPreview(key: String?, target: ThumbnailTarget, useCachedPreview: Boolean): Bitmap? {
+        if (key == null) return null
+        return withContext(embeddedThumbnailDispatcher) {
+            disk.use { cache ->
+                cache.openSnapshot(key)?.use snapshot@{ snapshot ->
+                    val preview = cache.fileSystem.read(snapshot.metadata) { StoredPreview.parse(readUtf8()) }
+                        ?: return@snapshot null
+                    if (preview.current && !useCachedPreview) {
+                        if (preview.covers(target.stored())) throw IOException("고화질 썸네일이 이미 있습니다.")
+                        null
+                    } else {
+                        decodeThumbnail(ImageDecoder.createSource(snapshot.data.toFile()), target.size, target.fill)
+                    }
+                }
+            }
+        }
     }
-}
-
-private fun DiskCache.hasPreview(key: String, stored: ThumbnailTarget): Boolean = try {
-    openSnapshot(key)?.use { snapshot ->
-        val preview = StoredPreview.parse(fileSystem.read(snapshot.metadata) { readUtf8() })
-        preview != null && (preview.complete || covers(preview.width, preview.height, stored.size, stored.fill))
-    } ?: false
-} catch (_: IOException) {
-    false
 }
 
 private fun DiskCache.read(key: String, stored: ThumbnailTarget, target: ThumbnailTarget): Bitmap? = try {
     openSnapshot(key)?.use { snapshot ->
         val preview = StoredPreview.parse(fileSystem.read(snapshot.metadata) { readUtf8() })
-        if (preview == null || !preview.complete && !covers(preview.width, preview.height, stored.size, stored.fill)) null
+        if (preview == null || !preview.current || !preview.covers(stored)) null
         else decodeThumbnail(ImageDecoder.createSource(snapshot.data.toFile()), target.size, target.fill)
     }
 } catch (_: IOException) {
@@ -157,13 +159,17 @@ private fun DiskCache.write(key: String, bitmap: Bitmap, complete: Boolean) {
 }
 
 /** 저장한 미리보기의 크기와, 원본이 작아 더 크게 만들 수 없는지 여부. */
-private data class StoredPreview(val width: Int, val height: Int, val complete: Boolean) {
-    fun format() = "$width $height ${if (complete) 1 else 0}"
+private data class StoredPreview(val width: Int, val height: Int, val complete: Boolean, val current: Boolean = true) {
+    fun covers(target: ThumbnailTarget): Boolean = complete || covers(width, height, target.size, target.fill)
+
+    fun format() = "$width $height ${if (complete) 1 else 0} $VERSION"
 
     companion object {
+        private const val VERSION = "2"
+
         fun parse(text: String): StoredPreview? {
             val parts = text.trim().split(' ')
-            if (parts.size != 3) return null
+            if (parts.size != 3 && (parts.size != 4 || parts[3] != VERSION)) return null
             val width = parts[0].toIntOrNull() ?: return null
             val height = parts[1].toIntOrNull() ?: return null
             val complete = when (parts[2]) {
@@ -171,7 +177,7 @@ private data class StoredPreview(val width: Int, val height: Int, val complete: 
                 "1" -> true
                 else -> return null
             }
-            return StoredPreview(width, height, complete)
+            return StoredPreview(width, height, complete, current = parts.size == 4)
         }
     }
 }

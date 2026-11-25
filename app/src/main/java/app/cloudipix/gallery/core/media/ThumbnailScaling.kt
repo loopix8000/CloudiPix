@@ -20,17 +20,20 @@ internal fun decodeThumbnail(source: ImageDecoder.Source, target: Size, fill: Bo
         val width = info.size.width
         val height = info.size.height
         val ratio = scaleRatio(width, height, target, fill)
-        // JPEG와 WebP는 디코더에서 바로 표시 크기로 줄인다. 다른 형식은 기존의 단계별 축소를 사용한다.
-        val averaged = info.mimeType == "image/jpeg" || info.mimeType == "image/webp"
-        if (averaged && ratio < 1f) {
-            decoder.setTargetSize((width * ratio).roundToInt().coerceAtLeast(1), (height * ratio).roundToInt().coerceAtLeast(1))
-            return@decodeBitmap
+        if (ratio >= 1f) return@decodeBitmap
+        // JPEG는 1/8까지 디코더에서 축소할 수 있다. 마지막 축소에는 각 축에 최소 두 픽셀을 남긴다.
+        val nativeSampleLimit = when (info.mimeType) {
+            "image/jpeg" -> 8
+            "image/webp" -> Int.MAX_VALUE
+            else -> 1
         }
         var sample = 1
-        while (sample * 2 * ratio <= 1f &&
-            width.toLong() * height / (sample.toLong() * sample) > MAX_FULL_DECODE_PIXELS
-        ) {
-            sample *= 2
+        val pixels = width.toLong() * height
+        while (sample * 2f * ratio <= 1f) {
+            val next = sample * 2
+            val withinBudget = pixels / sample / sample <= MAX_FULL_DECODE_PIXELS
+            if (withinBudget && (next > nativeSampleLimit || next * ratio > 0.5f)) break
+            sample = next
         }
         if (sample > 1) decoder.setTargetSampleSize(sample)
     }.scaleAndRecycle(target, fill)
