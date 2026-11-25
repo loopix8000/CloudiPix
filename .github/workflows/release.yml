@@ -1,0 +1,80 @@
+name: Android release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Install Android build tools
+        run: |
+          compile_sdk=$(sed -n 's/^compileSdk = "\([0-9]*\)"$/\1/p' gradle/libs.versions.toml)
+          build_tools=$(sed -n 's/^buildTools = "\([0-9.]*\)"$/\1/p' gradle/libs.versions.toml)
+          sdkmanager "platforms;android-$compile_sdk" "build-tools;$build_tools"
+          printf 'ANDROID_BUILD_TOOLS=%s/build-tools/%s\n' "$ANDROID_HOME" "$build_tools" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Sign and verify APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          : "${ANDROID_KEYSTORE_BASE64:?Missing ANDROID_KEYSTORE_BASE64}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?Missing ANDROID_KEYSTORE_PASSWORD}"
+          : "${ANDROID_KEY_ALIAS:?Missing ANDROID_KEY_ALIAS}"
+          : "${ANDROID_KEY_PASSWORD:?Missing ANDROID_KEY_PASSWORD}"
+          apk_dir=app/build/outputs/apk/release
+          metadata="$apk_dir/output-metadata.json"
+          jq -e --arg version "${GITHUB_REF_NAME#v}" '
+            .applicationId == "app.cloudipix.gallery" and
+            (.elements | length == 1) and .elements[0].versionName == $version
+          ' "$metadata" >/dev/null || { echo 'APK metadata does not match the release tag.' >&2; exit 1; }
+          unsigned_apk="$apk_dir/$(jq -er '.elements[0].outputFile' "$metadata")"
+
+          umask 077
+          keystore=$(mktemp "$RUNNER_TEMP/cloudipix-release.XXXXXX")
+          trap 'rm -f -- "$keystore"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          "$ANDROID_BUILD_TOOLS/zipalign" -P 16 -f 4 "$unsigned_apk" "$RUNNER_TEMP/aligned.apk"
+          "$ANDROID_BUILD_TOOLS/apksigner" sign \
+            --ks "$keystore" --ks-type PKCS12 --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+            --out "$RUNNER_TEMP/CloudiPix.apk" "$RUNNER_TEMP/aligned.apk"
+
+          verification=$("$ANDROID_BUILD_TOOLS/apksigner" verify --print-certs "$RUNNER_TEMP/CloudiPix.apk")
+          if ! grep -Fxq 'Signer #1 certificate SHA-256 digest: 4f9979a12b57910dcb6dd2b88b3f14b170d6d702e0986c775e6af6da94c01d77' <<< "$verification"; then
+            echo 'The APK was not signed with the CloudiPix release key.' >&2
+            exit 1
+          fi
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/CloudiPix.apk" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
+            --title "CloudiPix ${GITHUB_REF_NAME#v}"
