@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_sort_direction">Sort direction</string>
+    <string name="settings_quick_controls">Basic settings</string>
+    <string name="settings_group_app">App settings</string>
+    <string name="settings_section_privacy">Privacy and permissions</string>
+    <string name="settings_section_viewer">Viewer controls</string>
+    <string name="settings_section_cache">Cache</string>
+    <string name="settings_section_backup">Settings backup</string>
+    <string name="settings_page_advanced">Advanced settings</string>
+    <string name="settings_page_advanced_hint">Folder display, viewer controls, privacy, and backup</string>
+    <string name="setting_settings_theme">Settings theme</string>
+    <string name="settings_theme_follow_gallery">Follow gallery theme</string>
+</resources>

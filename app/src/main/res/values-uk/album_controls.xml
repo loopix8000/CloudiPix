@@ -1,0 +1,8 @@
+<resources>
+    <string name="album_rename">Перейменувати папку</string>
+    <string name="album_rename_failed">Не вдалося перейменувати папку.</string>
+    <string name="album_rename_done">Папку перейменовано на %1$s.</string>
+    <string name="album_move">Перемістити папку</string>
+    <string name="album_move_failed">Не вдалося перемістити папку. Виберіть іншу папку на тому ж носії.</string>
+    <string name="album_move_done">Папку %1$s переміщено.</string>
+</resources>

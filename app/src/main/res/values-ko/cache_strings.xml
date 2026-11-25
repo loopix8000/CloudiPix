@@ -1,0 +1,8 @@
+<resources>
+    <string name="setting_thumbnail_cache">썸네일 캐시</string>
+    <string name="setting_thumbnail_cache_hint">사용량 %1$s · 한도 %2$d MiB</string>
+    <string name="setting_thumbnail_cache_limit_hint">1 MiB 이상의 정수를 입력하세요. 한도를 줄이면 오래 보지 않은 썸네일부터 정리합니다.</string>
+    <string name="setting_clear_thumbnail_cache">썸네일 캐시 비우기</string>
+    <string name="setting_clear_thumbnail_cache_hint">썸네일은 사진을 볼 때 다시 만듭니다.</string>
+    <string name="settings_import_thumbnail_cache_review">썸네일 캐시 용량 설정을 확인해 주세요.</string>
+</resources>

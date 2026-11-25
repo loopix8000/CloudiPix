@@ -1,0 +1,19 @@
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="setting_app_lock">App lock</string>
+    <string name="setting_app_lock_hint">Require device authentication when returning to Gallery</string>
+    <string name="setting_hide_recents_preview">Hide preview in recent apps</string>
+    <string name="setting_hide_recents_preview_legacy_hint">This also blocks screenshots on this version of Android</string>
+    <string name="enable_folder_lock">Lock folder</string>
+    <string name="remove_folder_lock">Remove folder lock</string>
+    <string name="change_app_lock">Confirm app lock change</string>
+    <string name="change_folder_lock">Confirm folder lock change</string>
+    <string name="app_locked">Gallery is locked</string>
+    <string name="folder_locked">Folder is locked</string>
+    <string name="photo_auth_required">Verify to open this photo</string>
+    <string name="unlock_app">Unlock Gallery</string>
+    <string name="unlock_folder">Unlock folder</string>
+    <string name="lock_authenticate">Verify identity</string>
+    <string name="lock_back">Back</string>
+    <string name="device_lock_required">Set up a screen lock in Android settings to use this feature.</string>
+    <string name="open_device_security">Device security settings</string>
+</resources>

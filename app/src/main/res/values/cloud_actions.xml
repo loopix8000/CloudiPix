@@ -1,0 +1,10 @@
+<resources>
+    <string name="cloud_device">This device</string>
+    <string name="cloud_local_folder_path">This device · %1$s</string>
+    <string name="cloud_file_error">Could not complete the action. Check the connection, folder permissions and file name.</string>
+    <string name="cloud_trash_confirm">Move %1$d selected items to the trash?</string>
+    <string name="cloud_delete_confirm">Permanently delete %1$d selected items?</string>
+    <string name="cloud_original_kept">Copies saved. Originals you did not approve for deletion remain on this device.</string>
+    <string name="cloud_source_changed">Copies saved. Originals changed during transfer remain on this device.</string>
+    <string name="cloud_working">Working on the selected files…</string>
+</resources>

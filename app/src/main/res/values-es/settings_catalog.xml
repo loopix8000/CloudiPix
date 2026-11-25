@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_sort_direction">Dirección de ordenación</string>
+    <string name="settings_quick_controls">Ajustes básicos</string>
+    <string name="settings_group_app">Gestión de la aplicación</string>
+    <string name="settings_section_privacy">Privacidad y permisos</string>
+    <string name="settings_section_viewer">Controles del visor</string>
+    <string name="settings_section_cache">Caché</string>
+    <string name="settings_section_backup">Copia de seguridad de los ajustes</string>
+    <string name="cloudipix_back">Atrás</string>
+    <string name="settings_page_advanced">Ajustes avanzados</string>
+    <string name="settings_page_advanced_hint">Vista de carpetas, controles del visor, privacidad y copias de seguridad</string>
+    <string name="setting_settings_theme">Tema de ajustes</string>
+    <string name="settings_theme_follow_gallery">Seguir el tema de la galería</string>
+</resources>

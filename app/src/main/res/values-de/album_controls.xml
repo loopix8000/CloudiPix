@@ -1,0 +1,8 @@
+<resources>
+    <string name="album_rename">Ordner umbenennen</string>
+    <string name="album_rename_failed">Der Ordner konnte nicht umbenannt werden.</string>
+    <string name="album_rename_done">Ordner umbenannt in %1$s.</string>
+    <string name="album_move">Ordner verschieben</string>
+    <string name="album_move_failed">Der Ordner konnte nicht verschoben werden. Wähle einen anderen Ordner auf demselben Speicher.</string>
+    <string name="album_move_done">Ordner %1$s wurde verschoben.</string>
+</resources>

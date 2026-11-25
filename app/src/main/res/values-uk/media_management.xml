@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setting_confirm_trash">Підтверджувати переміщення до кошика</string>
+    <string name="setting_confirm_trash_hint">Вимкніть, щоб пропускати підтвердження в галереї. Android усе одно може запитати дозвіл для файлів на пристрої.</string>
+    <string name="media_management_title">Керування дозволами</string>
+    <string name="media_management_hint">Налаштуйте доступ до фото й відео.</string>
+    <string name="media_management_open_settings">Відкрити налаштування</string>
+    <string name="media_management_later">Пізніше</string>
+    <string name="media_management_unavailable">Налаштування керування медіафайлами недоступні на цьому пристрої.</string>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="all_files_access_title">Zugriff auf alle Dateien erlauben</string>
+    <string name="all_files_access_hint">Zum Verschieben und Synchronisieren von Geräteordnern, einschließlich des Download-Ordners, ist der Zugriff auf alle Dateien erforderlich.</string>
+    <string name="all_files_access_denied">Der Zugriff auf alle Dateien wurde nicht erlaubt. Es wurde nichts geändert.</string>
+    <string name="folder_browser_select">Diesen Ordner verwenden</string>
+    <string name="folder_browser_up">Eine Ebene nach oben</string>
+    <string name="folder_browser_empty">Keine Ordner vorhanden</string>
+    <string name="folder_browser_create_failed">Ordner konnte nicht erstellt werden</string>
+    <string name="sync_restore_all_files">Erlaube den Zugriff auf alle Dateien, um die Synchronisierung für %1$s wiederherzustellen.</string>
+    <string name="folder_browser_read_failed">Dieser Ordner kann nicht geöffnet werden</string>
+</resources>

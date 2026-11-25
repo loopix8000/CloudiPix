@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setting_confirm_trash">Confirmar antes de mover a la papelera</string>
+    <string name="setting_confirm_trash_hint">Desactiva esta opción para omitir la confirmación de la galería. Android puede seguir pidiendo permiso para los archivos del dispositivo.</string>
+    <string name="media_management_title">Gestionar permisos</string>
+    <string name="media_management_hint">Configura el acceso a fotos y vídeos.</string>
+    <string name="media_management_open_settings">Abrir ajustes</string>
+    <string name="media_management_later">Más tarde</string>
+    <string name="media_management_unavailable">Los ajustes de gestión multimedia no están disponibles en este dispositivo.</string>
+</resources>

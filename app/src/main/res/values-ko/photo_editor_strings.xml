@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="photo_editor_open_failed">편집할 사진을 열 수 없습니다</string>
+    <string name="photo_editor_preview_failed">편집 미리보기를 표시할 수 없습니다</string>
+    <string name="photo_editor_preview">사진 미리보기</string>
+    <string name="photo_editor_compare">전후 비교</string>
+    <string name="photo_editor_free_crop">자유</string>
+    <string name="photo_editor_landscape_ratios">가로 자르기 비율</string>
+    <string name="photo_editor_choose_app">사진 편집 앱 선택</string>
+    <string name="photo_editor_built_in">내장 편집기</string>
+    <string name="photo_editor_default_app">기본 사진 편집 앱</string>
+    <string name="photo_editor_always_ask">항상 묻기</string>
+    <string name="photo_editor_use_by_default">기본 편집 앱으로 사용</string>
+    <string name="photo_editor_opening_app">편집 앱에서 사진 여는 중</string>
+    <string name="photo_editor_no_external_app">호환되는 외부 편집 앱이 설치되어 있지 않습니다</string>
+    <string name="photo_editor_external_failed">선택한 앱에서 사진을 열 수 없습니다</string>
+    <string name="photo_editor_filters">필터</string>
+    <string name="photo_editor_original">원본</string>
+    <string name="photo_editor_mono">흑백</string>
+    <string name="photo_editor_sepia">세피아</string>
+    <string name="photo_editor_warm">따뜻함</string>
+    <string name="photo_editor_cool">차가움</string>
+    <string name="photo_editor_vivid">선명함</string>
+    <string name="photo_editor_draw">그리기</string>
+    <string name="photo_editor_add_text">텍스트 추가</string>
+    <string name="photo_editor_edit_text">텍스트 수정</string>
+    <string name="photo_editor_ink_white">흰색</string>
+    <string name="photo_editor_ink_black">검정</string>
+    <string name="photo_editor_ink_red">빨강</string>
+    <string name="photo_editor_ink_yellow">노랑</string>
+    <string name="photo_editor_ink_blue">파랑</string>
+    <string name="photo_editor_size_small">작게</string>
+    <string name="photo_editor_size_medium">보통</string>
+    <string name="photo_editor_size_large">크게</string>
+</resources>

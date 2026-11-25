@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="all_files_access_title">Дозволити доступ до всіх файлів</string>
+    <string name="all_files_access_hint">Щоб переміщувати й синхронізувати папки пристрою, зокрема папку Download, потрібен доступ до всіх файлів.</string>
+    <string name="all_files_access_denied">Доступ до всіх файлів не надано, тому нічого не змінено.</string>
+    <string name="folder_browser_select">Вибрати цю папку</string>
+    <string name="folder_browser_up">На рівень вище</string>
+    <string name="folder_browser_empty">Тут немає папок</string>
+    <string name="folder_browser_create_failed">Не вдалося створити папку</string>
+    <string name="sync_restore_all_files">Дозвольте доступ до всіх файлів, щоб відновити синхронізацію для %1$s.</string>
+    <string name="folder_browser_read_failed">Не вдалося відкрити цю папку</string>
+</resources>

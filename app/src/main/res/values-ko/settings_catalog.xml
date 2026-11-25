@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_sort_direction">정렬 방향</string>
+    <string name="settings_quick_controls">기본 설정</string>
+    <string name="settings_group_app">앱 관리</string>
+    <string name="settings_section_privacy">잠금 및 권한</string>
+    <string name="settings_section_viewer">뷰어 조작</string>
+    <string name="settings_section_cache">캐시</string>
+    <string name="settings_section_backup">설정 백업</string>
+    <string name="settings_page_advanced">고급 설정</string>
+    <string name="settings_page_advanced_hint">폴더 표시, 뷰어 조작, 잠금, 백업</string>
+    <string name="setting_settings_theme">설정 화면 테마</string>
+    <string name="settings_theme_follow_gallery">갤러리 테마 따르기</string>
+</resources>

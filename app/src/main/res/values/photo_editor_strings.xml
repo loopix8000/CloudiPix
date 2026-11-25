@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="photo_editor_open_failed">Couldn’t open the photo for editing</string>
+    <string name="photo_editor_preview_failed">Couldn’t update the photo preview</string>
+    <string name="photo_editor_preview">Photo preview</string>
+    <string name="photo_editor_compare">Compare before and after</string>
+    <string name="photo_editor_free_crop">Free</string>
+    <string name="photo_editor_landscape_ratios">Landscape crop ratios</string>
+    <string name="photo_editor_choose_app">Edit photo with</string>
+    <string name="photo_editor_built_in">Built-in editor</string>
+    <string name="photo_editor_default_app">Default photo editor</string>
+    <string name="photo_editor_always_ask">Always ask</string>
+    <string name="photo_editor_use_by_default">Use as my default editor</string>
+    <string name="photo_editor_opening_app">Opening photo in editor</string>
+    <string name="photo_editor_no_external_app">No compatible external editor installed</string>
+    <string name="photo_editor_external_failed">Couldn’t open the photo in that app</string>
+    <string name="photo_editor_filters">Filters</string>
+    <string name="photo_editor_original">Original</string>
+    <string name="photo_editor_mono">Mono</string>
+    <string name="photo_editor_sepia">Sepia</string>
+    <string name="photo_editor_warm">Warm</string>
+    <string name="photo_editor_cool">Cool</string>
+    <string name="photo_editor_vivid">Vivid</string>
+    <string name="photo_editor_draw">Draw</string>
+    <string name="photo_editor_add_text">Add text</string>
+    <string name="photo_editor_edit_text">Edit text</string>
+    <string name="photo_editor_ink_white">White</string>
+    <string name="photo_editor_ink_black">Black</string>
+    <string name="photo_editor_ink_red">Red</string>
+    <string name="photo_editor_ink_yellow">Yellow</string>
+    <string name="photo_editor_ink_blue">Blue</string>
+    <string name="photo_editor_size_small">Small</string>
+    <string name="photo_editor_size_medium">Medium</string>
+    <string name="photo_editor_size_large">Large</string>
+</resources>

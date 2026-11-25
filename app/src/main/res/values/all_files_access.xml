@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="all_files_access_title">Allow all files access</string>
+    <string name="all_files_access_hint">Moving and syncing device folders, including the Download folder, needs all files access.</string>
+    <string name="all_files_access_denied">All files access wasn\'t allowed, so nothing was changed.</string>
+    <string name="folder_browser_select">Use this folder</string>
+    <string name="folder_browser_up">Up one level</string>
+    <string name="folder_browser_empty">No folders here</string>
+    <string name="folder_browser_create_failed">Couldn\'t create the folder</string>
+    <string name="sync_restore_all_files">Allow all files access to restore sync for %1$s.</string>
+    <string name="folder_browser_read_failed">Cannot open this folder</string>
+</resources>

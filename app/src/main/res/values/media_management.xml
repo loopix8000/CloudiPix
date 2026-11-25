@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setting_confirm_trash">Confirm before moving to trash</string>
+    <string name="setting_confirm_trash_hint">Turn off to skip the gallery’s confirmation. Android may still ask for approval for device files.</string>
+    <string name="media_management_title">Manage permissions</string>
+    <string name="media_management_hint">Manage access to photos and videos.</string>
+    <string name="media_management_open_settings">Open settings</string>
+    <string name="media_management_later">Later</string>
+    <string name="media_management_unavailable">Media management settings are unavailable on this device.</string>
+</resources>

@@ -1,0 +1,10 @@
+<resources>
+    <string name="cloud_device">Dieses Gerät</string>
+    <string name="cloud_local_folder_path">Dieses Gerät · %1$s</string>
+    <string name="cloud_file_error">Die Aktion konnte nicht abgeschlossen werden. Prüfe Verbindung, Schreibrechte und Dateinamen.</string>
+    <string name="cloud_trash_confirm">%1$d ausgewählte Elemente in den Papierkorb verschieben?</string>
+    <string name="cloud_delete_confirm">%1$d ausgewählte Elemente endgültig löschen?</string>
+    <string name="cloud_original_kept">Kopien gespeichert. Originale, deren Löschung du nicht bestätigt hast, bleiben auf diesem Gerät.</string>
+    <string name="cloud_source_changed">Kopien gespeichert. Während der Übertragung geänderte Originale bleiben auf diesem Gerät.</string>
+    <string name="cloud_working">Ausgewählte Dateien werden verarbeitet…</string>
+</resources>

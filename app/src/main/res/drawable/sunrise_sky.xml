@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="432"
+    android:viewportHeight="432">
+    <!-- The SVG viewBox fills the central 288 units. The artwork extends into the adaptive inset. -->
+    <group android:scaleX="1.265934" android:scaleY="1.265934"
+        android:translateX="59.973626" android:translateY="56.175824">
+        <path android:pathData="M-48,-45H294V297H-48Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:startX="79" android:startY="16"
+                    android:endX="112" android:endY="154" android:type="linear">
+                    <item android:offset="0" android:color="#4981DF" />
+                    <item android:offset="0.54" android:color="#85A9EC" />
+                    <item android:offset="1" android:color="#C6D7F8" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <group android:scaleX="110" android:scaleY="90"
+            android:translateX="161" android:translateY="140">
+            <path android:pathData="M-2,-2H2V2H-2Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient android:centerX="0" android:centerY="0"
+                        android:gradientRadius="1" android:type="radial">
+                        <item android:offset="0" android:color="#F9D6BF" />
+                        <item android:offset="0.43" android:color="#D6EFC4C4" />
+                        <item android:offset="0.75" android:color="#6BC5B3D8" />
+                        <item android:offset="1" android:color="#00B5B8E4" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </group>
+    </group>
+</vector>
