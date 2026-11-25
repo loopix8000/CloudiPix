@@ -64,6 +64,7 @@ import kotlinx.coroutines.launch
  * @param cropState State of the zoom that contains option to set initial, min, max zoom,
  * enabling rotation, pan or zoom and contains current [CropData]
  * event propagations. Also contains [Rect] of visible area based on pan, zoom and rotation
+ * @param enableImagePan allows gestures to move the image while preserving crop bounds handling
  * @param zoomOnDoubleTap lambda that returns current [ZoomLevel] and based on current level
  * enables developer to define zoom on double tap gesture
  * @param onGestureStart callback to to notify gesture has started and return current
@@ -77,6 +78,7 @@ fun Modifier.crop(
     vararg keys: Any?,
     cropState: CropState,
     enableOneFingerZoom: Boolean = true,
+    enableImagePan: Boolean = true,
     zoomOnDoubleTap: (ZoomLevel) -> Float = cropState.DefaultOnDoubleTap,
     onDown: ((CropData) -> Unit)? = null,
     onMove: ((CropData) -> Unit)? = null,
@@ -97,7 +99,7 @@ fun Modifier.crop(
         // Current Zoom level
         var zoomLevel by remember { mutableStateOf(ZoomLevel.Min) }
 
-        val transformModifier = Modifier.pointerInput(*keys) {
+        val transformModifier = Modifier.pointerInput(*keys, enableImagePan) {
             detectTransformGestures(
                 consume = false,
                 onGestureStart = {
@@ -115,7 +117,7 @@ fun Modifier.crop(
                     coroutineScope.launch {
                         cropState.onGesture(
                             centroid = centroid,
-                            panChange = pan,
+                            panChange = if (enableImagePan) pan else Offset.Zero,
                             zoomChange = zoom,
                             rotationChange = rotate,
                             mainPointer = mainPointer,
@@ -218,6 +220,7 @@ fun Modifier.crop(
         properties["onMove"] = onGesture
         properties["onUp"] = onGestureEnd
         properties["enableOneFingerZoom"] = enableOneFingerZoom
+        properties["enableImagePan"] = enableImagePan
     }
 )
 

@@ -173,16 +173,21 @@ fun PhotoEditorScreen(onBack: () -> Unit, viewModel: PhotoEditorViewModel = hilt
     }
 
     fun closeEditor() {
-        if (state.saving) return
-        if (cropping) cropper.endTransformation()
-        if (state.edit != PhotoEdit() || (cropping && hasCropChanges())) {
+        val current = viewModel.state.value
+        if (current.saving) return
+        val cropOpen = panel == EditorPanel.Crop
+        if (cropOpen) cropper.endTransformation()
+        if (current.edit != PhotoEdit() || (cropOpen && hasCropChanges())) {
             confirmClose = true
         } else {
             onBack()
         }
     }
 
-    BackHandler(onBack = ::closeEditor)
+    BackHandler {
+        if (viewModel.state.value.saving) return@BackHandler
+        if (panel != null) showPanel(null) else closeEditor()
+    }
     LaunchedEffect(state.notice) {
         val notice = state.notice ?: return@LaunchedEffect
         Toast.makeText(context, notice, Toast.LENGTH_SHORT).show()
@@ -257,6 +262,7 @@ fun PhotoEditorScreen(onBack: () -> Unit, viewModel: PhotoEditorViewModel = hilt
                         contentDescription = description,
                         cropProperties = cropProperties,
                         state = cropper,
+                        enableImagePan = false,
                         isOverlayDraggable = frameReady,
                         onCropStart = {},
                         onZoomChange = {},
