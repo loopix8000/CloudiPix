@@ -377,16 +377,14 @@
     <string name="update_downloading">Téléchargement de la mise à jour…</string>
     <string name="update_verifying">Vérification de la mise à jour…</string>
     <string name="update_install">Installer la mise à jour</string>
-    <string name="update_permission">Dans les paramètres Android, autorisez CloudiPix à installer des applications, puis revenez ici.</string>
+    <string name="update_open_download">Ouvrez Téléchargements → CloudiPix dans le gestionnaire de fichiers, puis touchez le fichier APK téléchargé pour installer la mise à jour.</string>
     <string name="update_source_missing">Aucun dépôt de mises à jour n’est configuré pour cette version.</string>
     <string name="update_release_missing">Aucune version publiée n’a été trouvée dans le dépôt de mises à jour.</string>
     <string name="update_version_invalid">Le format de version de l’application ou de la publication n’est pas pris en charge.</string>
     <string name="update_apk_missing">Aucun APK installable n’a été trouvé dans la publication.</string>
     <string name="update_apk_incompatible">L’APK est invalide ou incompatible avec la version installée de CloudiPix.</string>
-    <string name="update_apk_removed">L’APK téléchargé n’est plus disponible. Recherchez à nouveau les mises à jour.</string>
     <string name="update_check_failed">Impossible de rechercher des mises à jour. Réessayez.</string>
     <string name="update_download_failed">Impossible de télécharger la mise à jour. Réessayez.</string>
-    <string name="update_install_failed">Impossible d’ouvrir l’écran d’installation Android.</string>
     <string name="setting_about_hint">Version, licence et crédits open source</string>
     <string name="about_tagline">Les photos de votre téléphone et de votre NAS au même endroit.</string>
     <string name="about_version">Version</string>

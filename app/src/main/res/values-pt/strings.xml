@@ -377,16 +377,14 @@
     <string name="update_downloading">A transferir a atualização…</string>
     <string name="update_verifying">A verificar a atualização…</string>
     <string name="update_install">Instalar atualização</string>
-    <string name="update_permission">Nas definições do Android, permita que o CloudiPix instale aplicações e volte a este ecrã.</string>
+    <string name="update_open_download">Abra Transferências → CloudiPix no gestor de ficheiros e toque no APK transferido para instalar a atualização.</string>
     <string name="update_source_missing">Esta compilação não tem um repositório de atualizações configurado.</string>
     <string name="update_release_missing">Não foi encontrada nenhuma versão publicada no repositório de atualizações.</string>
     <string name="update_version_invalid">O formato da versão da aplicação ou da publicação não é suportado.</string>
     <string name="update_apk_missing">A publicação não contém um APK instalável.</string>
     <string name="update_apk_incompatible">O APK é inválido ou incompatível com a instalação atual do CloudiPix.</string>
-    <string name="update_apk_removed">O APK transferido já não está disponível. Procure atualizações novamente.</string>
     <string name="update_check_failed">Não foi possível procurar atualizações. Tente novamente.</string>
     <string name="update_download_failed">Não foi possível transferir a atualização. Tente novamente.</string>
-    <string name="update_install_failed">Não foi possível abrir o ecrã de instalação do Android.</string>
     <string name="setting_about_hint">Versão, licença e créditos de código aberto</string>
     <string name="about_tagline">As fotos do telemóvel e do NAS num só lugar.</string>
     <string name="about_version">Versão</string>

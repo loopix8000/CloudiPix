@@ -377,16 +377,14 @@
     <string name="update_downloading">Завантаження оновлення…</string>
     <string name="update_verifying">Перевірка оновлення…</string>
     <string name="update_install">Встановити оновлення</string>
-    <string name="update_permission">Дозвольте CloudiPix встановлювати застосунки в налаштуваннях Android, а потім поверніться сюди.</string>
+    <string name="update_open_download">Відкрийте Завантаження → CloudiPix у файловому менеджері й торкніться завантаженого APK, щоб установити оновлення.</string>
     <string name="update_source_missing">Для цієї збірки не налаштовано репозиторій оновлень.</string>
     <string name="update_release_missing">У репозиторії оновлень немає опублікованого випуску.</string>
     <string name="update_version_invalid">Формат версії застосунку або випуску не підтримується.</string>
     <string name="update_apk_missing">У випуску не знайдено APK для встановлення.</string>
     <string name="update_apk_incompatible">APK недійсний або несумісний із поточною версією CloudiPix.</string>
-    <string name="update_apk_removed">Завантажений APK більше не доступний. Перевірте оновлення ще раз.</string>
     <string name="update_check_failed">Не вдалося перевірити оновлення. Спробуйте ще раз.</string>
     <string name="update_download_failed">Не вдалося завантажити оновлення. Спробуйте ще раз.</string>
-    <string name="update_install_failed">Не вдалося відкрити екран встановлення Android.</string>
     <string name="setting_about_hint">Версія, ліцензія та відомості про відкритий код</string>
     <string name="about_tagline">Фото з телефона й NAS в одному місці.</string>
     <string name="about_version">Версія</string>

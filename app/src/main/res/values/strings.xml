@@ -386,16 +386,14 @@
     <string name="update_downloading">Downloading update…</string>
     <string name="update_verifying">Verifying update…</string>
     <string name="update_install">Install update</string>
-    <string name="update_permission">In Android settings, allow CloudiPix to install apps. Then return here to continue.</string>
+    <string name="update_open_download">Open Downloads → CloudiPix in your file manager, then tap the downloaded APK to install the update.</string>
     <string name="update_source_missing">This build has no update repository configured.</string>
     <string name="update_release_missing">No published release was found in the update repository.</string>
     <string name="update_version_invalid">The app or release version format is unsupported.</string>
     <string name="update_apk_missing">No installable APK was found in the release.</string>
     <string name="update_apk_incompatible">The APK is invalid or does not match this CloudiPix installation.</string>
-    <string name="update_apk_removed">The downloaded APK is no longer available. Check for updates again.</string>
     <string name="update_check_failed">Couldn’t check for updates. Try again.</string>
     <string name="update_download_failed">Couldn’t download the update. Try again.</string>
-    <string name="update_install_failed">Couldn’t open the Android installation screen.</string>
     <string name="setting_about_hint">Version, licence and open-source credits</string>
     <string name="about_app_name" translatable="false">Cloudify Gallery</string>
     <string name="about_tagline">Photos on your phone and NAS, together.</string>

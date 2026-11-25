@@ -1,14 +1,16 @@
 package app.cloudipix.gallery.core.update
 
+import android.content.ContentValues
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
-import androidx.core.content.FileProvider
+import android.os.Environment
+import android.provider.MediaStore
 import app.cloudipix.gallery.BuildConfig
 import app.cloudipix.gallery.R
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -20,8 +22,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
-
-class UpdateFileProvider : FileProvider()
 
 internal data class AppUpdate(val versionName: String, val downloadUrl: HttpUrl, val size: Long)
 
@@ -61,7 +61,7 @@ internal object GitHubAppUpdates {
         }
     }
 
-    suspend fun download(context: Context, update: AppUpdate, onProgress: (Int) -> Unit): File =
+    suspend fun download(context: Context, update: AppUpdate, onProgress: (Int) -> Unit) =
         withContext(Dispatchers.IO) {
             val directory = File(context.cacheDir, "apk-updates")
             directory.mkdirs()
@@ -92,19 +92,32 @@ internal object GitHubAppUpdates {
                 ensureActive()
                 verifyApk(context, update, partial)
                 ensureActive()
-                val destination = File(directory, "CloudiPix.apk")
-                if (!partial.renameTo(destination)) throw IOException("Could not save APK")
-                destination
+                saveToDownloads(context, update, partial)
             } finally {
                 partial.delete()
             }
         }
 
-    fun installIntent(context: Context, apk: File): Intent {
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", apk)
-        return Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, APK_MIME_TYPE)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    private suspend fun saveToDownloads(context: Context, update: AppUpdate, apk: File) {
+        val resolver = context.contentResolver
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "CloudiPix-${update.versionName}.apk")
+            put(MediaStore.MediaColumns.MIME_TYPE, APK_MIME_TYPE)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/CloudiPix/")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw IOException("Could not create the update download")
+        try {
+            resolver.openOutputStream(uri)?.use { output -> apk.inputStream().use { it.copyTo(output) } }
+                ?: throw IOException("Could not save the update download")
+            currentCoroutineContext().ensureActive()
+            val publish = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+            if (resolver.update(uri, publish, null, null) != 1) throw IOException("Could not publish the update download")
+        } catch (e: Exception) {
+            runCatching { resolver.delete(uri, null, null) }
+            throw e
+        }
     }
 
     private fun isNewer(candidate: String, current: String): Boolean {

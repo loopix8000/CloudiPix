@@ -1,14 +1,7 @@
 package app.cloudipix.gallery.ui
 
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,7 +26,6 @@ import app.cloudipix.gallery.core.update.AppUpdate
 import app.cloudipix.gallery.core.update.AppUpdateException
 import app.cloudipix.gallery.core.update.GitHubAppUpdates
 import app.cloudipix.gallery.ui.component.GalleryAlertDialog
-import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,39 +39,15 @@ internal fun AppUpdateRow(installedVersion: String) {
     var update by remember { mutableStateOf<AppUpdate?>(null) }
     var download by remember { mutableStateOf<Job?>(null) }
     val downloadProgress = remember { MutableStateFlow(0) }
-    var readyApk by remember { mutableStateOf<File?>(null) }
-    var showPermission by remember { mutableStateOf(false) }
+    var showDownloaded by remember { mutableStateOf(false) }
 
     fun showMessage(message: Int) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
-    fun install(apk: File) {
-        if (!apk.isFile) {
-            readyApk = null
-            showMessage(R.string.update_apk_removed)
-        } else if (!context.packageManager.canRequestPackageInstalls()) {
-            showPermission = true
-        } else {
-            try {
-                context.startActivity(GitHubAppUpdates.installIntent(context, apk))
-            } catch (_: Exception) {
-                showMessage(R.string.update_install_failed)
-            }
-        }
-    }
-
-    val permissionSettings = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (context.packageManager.canRequestPackageInstalls()) readyApk?.let(::install)
-    }
-
     ListItem(
         headlineContent = {
-            val label = when {
-                checking -> R.string.update_checking
-                readyApk != null -> R.string.update_install
-                else -> R.string.update_check
-            }
+            val label = if (checking) R.string.update_checking else R.string.update_check
             Text(stringResource(label))
         },
         trailingContent = {
@@ -87,22 +55,17 @@ internal fun AppUpdateRow(installedVersion: String) {
         },
         modifier = Modifier.clickable(enabled = !checking && download == null, role = Role.Button) {
             if (checking || download != null) return@clickable
-            val apk = readyApk
-            if (apk != null) {
-                install(apk)
-            } else {
-                checking = true
-                scope.launch {
-                    try {
-                        update = GitHubAppUpdates.check(installedVersion)
-                        if (update == null) showMessage(R.string.update_latest)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        showMessage((e as? AppUpdateException)?.messageRes ?: R.string.update_check_failed)
-                    } finally {
-                        checking = false
-                    }
+            checking = true
+            scope.launch {
+                try {
+                    update = GitHubAppUpdates.check(installedVersion)
+                    if (update == null) showMessage(R.string.update_latest)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    showMessage((e as? AppUpdateException)?.messageRes ?: R.string.update_check_failed)
+                } finally {
+                    checking = false
                 }
             }
         },
@@ -121,9 +84,8 @@ internal fun AppUpdateRow(installedVersion: String) {
                     downloadProgress.value = 0
                     download = scope.launch {
                         try {
-                            val apk = GitHubAppUpdates.download(context, available) { downloadProgress.value = it }
-                            readyApk = apk
-                            install(apk)
+                            GitHubAppUpdates.download(context, available) { downloadProgress.value = it }
+                            showDownloaded = true
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
@@ -154,24 +116,13 @@ internal fun AppUpdateRow(installedVersion: String) {
         )
     }
 
-    if (showPermission) {
+    if (showDownloaded) {
         GalleryAlertDialog(
-            onDismissRequest = { showPermission = false },
+            onDismissRequest = { showDownloaded = false },
             title = { Text(stringResource(R.string.update_install)) },
-            text = { Text(stringResource(R.string.update_permission)) },
+            text = { Text(stringResource(R.string.update_open_download)) },
             confirmButton = {
-                TextButton(onClick = {
-                    showPermission = false
-                    val packageUri = Uri.fromParts("package", context.packageName, null)
-                    try {
-                        permissionSettings.launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, packageUri))
-                    } catch (_: Exception) {
-                        showMessage(R.string.update_install_failed)
-                    }
-                }) { Text(stringResource(R.string.permission_open_settings)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPermission = false }) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = { showDownloaded = false }) { Text(stringResource(R.string.action_close)) }
             },
         )
     }

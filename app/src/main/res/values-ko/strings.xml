@@ -384,16 +384,14 @@
     <string name="update_downloading">업데이트 다운로드 중…</string>
     <string name="update_verifying">다운로드한 APK 확인 중…</string>
     <string name="update_install">업데이트 설치</string>
-    <string name="update_permission">Android 설정에서 CloudiPix의 앱 설치를 허용한 뒤 돌아오세요.</string>
+    <string name="update_open_download">파일 관리자에서 다운로드 → CloudiPix 폴더를 열고 APK를 선택하면 업데이트를 설치할 수 있습니다.</string>
     <string name="update_source_missing">이 빌드에는 업데이트 저장소가 설정되지 않았습니다.</string>
     <string name="update_release_missing">업데이트 저장소에서 게시된 릴리스를 찾지 못했습니다.</string>
     <string name="update_version_invalid">앱 또는 릴리스의 버전 형식을 지원하지 않습니다.</string>
     <string name="update_apk_missing">릴리스에서 설치용 APK를 찾지 못했습니다.</string>
     <string name="update_apk_incompatible">APK가 올바르지 않거나 현재 설치된 CloudiPix와 호환되지 않습니다.</string>
-    <string name="update_apk_removed">다운로드한 APK가 없습니다. 업데이트를 다시 확인하세요.</string>
     <string name="update_check_failed">업데이트를 확인하지 못했습니다. 다시 시도하세요.</string>
     <string name="update_download_failed">업데이트를 다운로드하지 못했습니다. 다시 시도하세요.</string>
-    <string name="update_install_failed">Android 설치 화면을 열 수 없습니다.</string>
     <string name="setting_about_hint">버전, 라이선스 및 오픈 소스 고지</string>
     <string name="about_tagline">폰과 NAS의 사진을 한곳에서.</string>
     <string name="about_version">버전</string>

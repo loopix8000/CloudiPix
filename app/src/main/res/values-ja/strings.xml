@@ -370,16 +370,14 @@
     <string name="update_downloading">更新をダウンロードしています…</string>
     <string name="update_verifying">更新を検証しています…</string>
     <string name="update_install">更新をインストール</string>
-    <string name="update_permission">Android の設定で CloudiPix にアプリのインストールを許可してから、ここに戻ってください。</string>
+    <string name="update_open_download">ファイル管理アプリで「ダウンロード → CloudiPix」を開き、ダウンロードした APK をタップして更新をインストールしてください。</string>
     <string name="update_source_missing">このビルドには更新用リポジトリが設定されていません。</string>
     <string name="update_release_missing">更新用リポジトリに公開済みのリリースが見つかりません。</string>
     <string name="update_version_invalid">アプリまたはリリースのバージョン形式に対応していません。</string>
     <string name="update_apk_missing">リリースにインストール可能な APK が見つかりません。</string>
     <string name="update_apk_incompatible">APK が無効か、インストール済みの CloudiPix と互換性がありません。</string>
-    <string name="update_apk_removed">ダウンロードした APK が見つかりません。もう一度更新を確認してください。</string>
     <string name="update_check_failed">更新を確認できませんでした。もう一度お試しください。</string>
     <string name="update_download_failed">更新をダウンロードできませんでした。もう一度お試しください。</string>
-    <string name="update_install_failed">Android のインストール画面を開けませんでした。</string>
     <string name="setting_about_hint">バージョン、ライセンス、オープンソース情報</string>
     <string name="about_tagline">スマートフォンと NAS の写真をまとめて表示できます。</string>
     <string name="about_version">バージョン</string>
