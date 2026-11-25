@@ -19,7 +19,7 @@
             </aapt:attr>
         </path>
         <group android:scaleX="110" android:scaleY="90"
-            android:translateX="153" android:translateY="140">
+            android:translateX="154" android:translateY="142">
             <path android:pathData="M-2,-2H2V2H-2Z">
                 <aapt:attr name="android:fillColor">
                     <gradient android:centerX="0" android:centerY="0"
