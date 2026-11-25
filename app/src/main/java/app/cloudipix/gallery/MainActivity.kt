@@ -38,6 +38,7 @@ import app.cloudipix.gallery.feature.viewer.openedMedium
 import app.cloudipix.gallery.navigation.GalleryNavHost
 import app.cloudipix.gallery.navigation.Folders
 import app.cloudipix.gallery.navigation.Media
+import app.cloudipix.gallery.ui.AutomaticUpdatePrompt
 import androidx.compose.ui.graphics.Color
 import app.cloudipix.gallery.ui.theme.GalleryTheme
 import kotlinx.coroutines.Job
@@ -212,6 +213,8 @@ abstract class GalleryActivity : ComponentActivity() {
                             openAlbum = ::openAlbum,
                         )
                     }
+                    // 다른 앱에서 연 사진 보기에서는 업데이트 안내로 흐름을 끊지 않는다.
+                    if (opened == null) AutomaticUpdatePrompt()
                 }
             }
         }

@@ -24,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.cloudipix.gallery.R
 import app.cloudipix.gallery.core.update.AppUpdate
 import app.cloudipix.gallery.core.update.AppUpdateException
+import app.cloudipix.gallery.core.update.AutomaticUpdateCheck
 import app.cloudipix.gallery.core.update.GitHubAppUpdates
 import app.cloudipix.gallery.ui.component.GalleryAlertDialog
 import kotlinx.coroutines.CancellationException
@@ -37,13 +38,7 @@ internal fun AppUpdateRow(installedVersion: String) {
     val scope = rememberCoroutineScope()
     var checking by remember { mutableStateOf(false) }
     var update by remember { mutableStateOf<AppUpdate?>(null) }
-    var download by remember { mutableStateOf<Job?>(null) }
-    val downloadProgress = remember { MutableStateFlow(0) }
-    var showDownloaded by remember { mutableStateOf(false) }
-
-    fun showMessage(message: Int) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-    }
+    var downloading by remember { mutableStateOf(false) }
 
     ListItem(
         headlineContent = {
@@ -53,17 +48,18 @@ internal fun AppUpdateRow(installedVersion: String) {
         trailingContent = {
             if (checking) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         },
-        modifier = Modifier.clickable(enabled = !checking && download == null, role = Role.Button) {
-            if (checking || download != null) return@clickable
+        modifier = Modifier.clickable(enabled = !checking && !downloading, role = Role.Button) {
+            if (checking || downloading) return@clickable
             checking = true
             scope.launch {
                 try {
                     update = GitHubAppUpdates.check(installedVersion)
-                    if (update == null) showMessage(R.string.update_latest)
+                    if (update == null) Toast.makeText(context, R.string.update_latest, Toast.LENGTH_SHORT).show()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    showMessage((e as? AppUpdateException)?.messageRes ?: R.string.update_check_failed)
+                    val message = (e as? AppUpdateException)?.messageRes ?: R.string.update_check_failed
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 } finally {
                     checking = false
                 }
@@ -71,24 +67,50 @@ internal fun AppUpdateRow(installedVersion: String) {
         },
     )
 
-    val available = update
-    if (available != null) {
+    AppUpdateDialogs(update, onDismiss = { update = null }, onDownloadingChange = { downloading = it })
+}
+
+/** 하루 한 번 자동으로 확인한 새 버전을 알리고, 사용자가 원하면 바로 내려받습니다. */
+@Composable
+internal fun AutomaticUpdatePrompt() {
+    val update by AutomaticUpdateCheck.available.collectAsStateWithLifecycle()
+    AppUpdateDialogs(update, onDismiss = AutomaticUpdateCheck::dismiss)
+}
+
+/**
+ * 새 버전 안내, 다운로드 진행, 설치 안내 창을 차례로 보여줍니다.
+ * 다운로드는 안내 창을 닫은 뒤에도 이어지므로 이 함수는 [update]가 없어도 계속 구성해 둡니다.
+ */
+@Composable
+private fun AppUpdateDialogs(
+    update: AppUpdate?,
+    onDismiss: () -> Unit,
+    onDownloadingChange: (Boolean) -> Unit = {},
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var download by remember { mutableStateOf<Job?>(null) }
+    val downloadProgress = remember { MutableStateFlow(0) }
+    var showDownloaded by remember { mutableStateOf(false) }
+
+    if (update != null) {
         GalleryAlertDialog(
-            onDismissRequest = { update = null },
+            onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.update_available)) },
-            text = { Text(stringResource(R.string.update_available_version, available.versionName)) },
+            text = { Text(stringResource(R.string.update_available_version, update.versionName)) },
             confirmButton = {
                 TextButton(onClick = startDownload@{
-                    if (update == null || download != null) return@startDownload
-                    update = null
+                    if (download != null) return@startDownload
+                    onDismiss()
                     downloadProgress.value = 0
+                    onDownloadingChange(true)
                     download = scope.launch {
                         try {
-                            GitHubAppUpdates.download(context, available) { downloadProgress.value = it }
+                            GitHubAppUpdates.download(context, update) { downloadProgress.value = it }
                             // 받은 APK가 있는 폴더를 바로 열어 한 번만 누르면 설치되게 합니다.
                             // 열 수 있는 파일 앱이 없으면 직접 찾아가는 방법을 안내합니다.
                             if (GitHubAppUpdates.openDownloadFolder(context)) {
-                                val hint = context.getString(R.string.update_tap_apk, GitHubAppUpdates.apkFileName(available))
+                                val hint = context.getString(R.string.update_tap_apk, GitHubAppUpdates.apkFileName(update))
                                 Toast.makeText(context, hint, Toast.LENGTH_LONG).show()
                             } else {
                                 showDownloaded = true
@@ -96,15 +118,17 @@ internal fun AppUpdateRow(installedVersion: String) {
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            showMessage((e as? AppUpdateException)?.messageRes ?: R.string.update_download_failed)
+                            val message = (e as? AppUpdateException)?.messageRes ?: R.string.update_download_failed
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                         } finally {
                             download = null
+                            onDownloadingChange(false)
                         }
                     }
                 }) { Text(stringResource(R.string.update_download)) }
             },
             dismissButton = {
-                TextButton(onClick = { update = null }) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
