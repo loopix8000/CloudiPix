@@ -23,8 +23,8 @@ android {
         applicationId = "app.loopix.gallery"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 7
-        versionName = "0.1.6"
+        versionCode = 8
+        versionName = "0.1.7"
         testInstrumentationRunner = "app.cloudipix.gallery.GalleryTestRunner"
         buildConfigField("String", "UPDATE_REPOSITORY", "\"$updateRepository\"")
         vectorDrawables.useSupportLibrary = true
