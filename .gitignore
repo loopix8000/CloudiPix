@@ -17,7 +17,6 @@ keystore.properties
 /.verify-theme-a53.ps1
 /.verify-viewer-a53.ps1
 /AGENTS.md
-/README.md
 /app/schemas/
 /app/src/androidTest/
 /app/src/test/
