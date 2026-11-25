@@ -18,6 +18,7 @@ import app.cloudipix.gallery.core.model.FolderEntry
 import app.cloudipix.gallery.core.model.MediaFilter
 import app.cloudipix.gallery.core.model.MediaType
 import app.cloudipix.gallery.core.model.Medium
+import app.cloudipix.gallery.core.model.manualSortPosition
 import app.cloudipix.gallery.core.model.sortedBy
 import app.cloudipix.gallery.core.remote.RemoteFiles
 import app.cloudipix.gallery.core.remote.RemoteGallery
@@ -134,7 +135,7 @@ internal data class PickerFolders(val shown: List<Folder>, val hidden: List<Fold
 private fun List<Folder>.inFolderScreenOrder(config: GallerySettings): List<Folder> {
     val ordered = if (config.manualFolderSort) {
         val positions = config.folderOrder.withIndex().associate { it.value to it.index }
-        sortedBy { positions[it.bucketId] ?: Int.MAX_VALUE }
+        sortedBy { it.manualSortPosition(positions) ?: Int.MAX_VALUE }
     } else sortedBy(config.sorting)
     return ordered.sortedByDescending(Folder::isPinned)
 }

@@ -457,8 +457,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     suspend fun useManualFolderSort() = put(Keys.manualFolderSort, true)
 
-    suspend fun saveFolderOrder(order: List<Long>) {
-        context.dataStore.edit { it.setFolderOrder(order) }
+    suspend fun saveFolderOrder(order: List<Long>, localByCloud: Map<Long, Long> = emptyMap()) {
+        context.dataStore.edit { it.setFolderOrder(order, localByCloud) }
     }
 
     suspend fun renameHomeTab(name: String?) {
@@ -467,25 +467,34 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         }
     }
 
-    suspend fun moveFoldersToTab(ids: Set<Long>, from: String, to: String, order: List<Long>? = null): Boolean {
+    suspend fun moveFoldersToTab(
+        ids: Set<Long>, from: String, to: String, order: List<Long>? = null,
+        localByCloud: Map<Long, Long> = emptyMap(),
+    ): Boolean {
         if (ids.isEmpty() || from == to) return false
         val home = FolderTab.Home.id
+        val matchingIds = ids + ids.mapNotNull(localByCloud::get)
         var moved = false
         context.dataStore.edit { prefs ->
             val tabs = prefs.folderTabs()
             if (to != home && tabs.none { it.id == to }) return@edit
-            val stillInSource = if (from == home) tabs.none { tab -> ids.any { it in tab.folderIds } }
-                else tabs.find { it.id == from }?.folderIds?.containsAll(ids) == true
-            if (!stillInSource) return@edit
+            val movedIds = if (from == home) {
+                if (tabs.any { tab -> matchingIds.any { it in tab.folderIds } }) return@edit
+                ids
+            } else {
+                val source = tabs.find { it.id == from }?.folderIds ?: return@edit
+                if (ids.any { it !in source && localByCloud[it]?.let(source::contains) != true }) return@edit
+                source.intersect(matchingIds)
+            }
             val updated = tabs.map { tab ->
                 when {
-                    tab.id == to -> tab.copy(folderIds = tab.folderIds + ids)
-                    tab.id == from || to == home -> tab.copy(folderIds = tab.folderIds - ids)
+                    tab.id == to -> tab.copy(folderIds = tab.folderIds + movedIds)
+                    tab.id == from || to == home -> tab.copy(folderIds = tab.folderIds - matchingIds)
                     else -> tab
                 }
             }
             prefs[Keys.folderTabs] = Json.encodeToString(updated)
-            if (order != null) prefs.setFolderOrder(order)
+            if (order != null) prefs.setFolderOrder(order, localByCloud)
             moved = true
         }
         return moved
@@ -585,11 +594,14 @@ private fun MutablePreferences.setFolderMediaSettings(folders: Map<Long, FolderM
 private fun Preferences.folderOrder(): List<Long> =
     this[Keys.folderOrder]?.split(',')?.mapNotNull(String::toLongOrNull)?.distinct().orEmpty()
 
-private fun MutablePreferences.setFolderOrder(order: List<Long>) {
-    val visible = order.toHashSet()
-    val updates = order.iterator()
+private fun MutablePreferences.setFolderOrder(order: List<Long>, localByCloud: Map<Long, Long>) {
+    val current = folderOrder()
+    val saved = current.toHashSet()
+    val updated = order.map { id -> localByCloud[id]?.takeIf(saved::contains) ?: id }
+    val visible = updated.toHashSet()
+    val updates = updated.iterator()
     // 필터 때문에 감춰진 폴더의 상대 위치는 그대로 둔다.
-    val merged = folderOrder().map { if (it in visible) updates.next() else it } + updates.asSequence().toList()
+    val merged = current.map { if (it in visible) updates.next() else it } + updates.asSequence().toList()
     this[Keys.folderOrder] = merged.joinToString(",")
     this[Keys.manualFolderSort] = true
 }

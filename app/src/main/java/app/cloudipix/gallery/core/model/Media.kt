@@ -44,6 +44,8 @@ data class Folder(
     val isLocked: Boolean = false,
     val automaticCover: Uri? = null,
     val isHidden: Boolean = false,
+    // A merged folder uses the server ID for media access and can retain layout saved under this device ID.
+    val localBucketId: Long? = null,
 ) : Sortable {
     override val typeRank: Int get() = coverType
     val isRecent: Boolean get() = bucketId == RECENT_BUCKET_ID
@@ -66,6 +68,7 @@ fun List<Folder>.recent(): Folder? = maxByOrNull(Folder::dateTaken)?.copy(
     dateModified = maxOf(Folder::dateModified),
     isPinned = false,
     manualCover = null,
+    localBucketId = null,
 )
 
 data class FolderEntry(
@@ -75,6 +78,7 @@ data class FolderEntry(
     val itemCount: Int,
     val volumeName: String? = null,
     val syncLocalPath: LocalStoragePath? = null,
+    val localBucketId: Long? = null,
 )
 
 fun mediaUri(id: Long, type: MediaType): Uri = ContentUris.withAppendedId(

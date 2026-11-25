@@ -26,6 +26,7 @@ internal class AlbumMirrors(
     files: List<MediumEntity>,
     private val filters: Map<Long, SyncFileFilter> = emptyMap(),
 ) {
+    val localByCloud = cloudByLocal.entries.associate { (local, cloud) -> cloud to local }
     private val filesByCloud = files.groupBy { cloudByLocal.getValue(it.bucketId) }
     private val filesByName = filesByCloud.mapValues { (_, items) -> items.associateBy(MediumEntity::name) }
     private val visibleLocal = files.mapTo(hashSetOf(), MediumEntity::bucketId)
@@ -78,13 +79,17 @@ internal class AlbumMirrors(
         val represented = cloud.mapTo(hashSetOf(), Folder::bucketId)
         return local.mapNotNull { folder ->
             val id = cloudByLocal[folder.bucketId] ?: return@mapNotNull folder
+            val pinned = folder.isPinned || id in pins
             when {
                 id in represented || id in hidden -> null
                 folder.bucketId !in visibleLocal -> folder
-                id in filters -> folder.filteredMirror(id, id in pins, mediaFilter)
-                else -> folder.copy(bucketId = id, isPinned = id in pins)
+                id in filters -> folder.filteredMirror(id, pinned, mediaFilter)
+                else -> folder.copy(bucketId = id, isPinned = pinned, localBucketId = folder.bucketId)
             }
-        } + cloud
+        } + cloud.map { folder ->
+            val local = localByCloud[folder.bucketId] ?: return@map folder
+            folder.copy(localBucketId = local, isPinned = folder.isPinned || local in pins)
+        }
     }
 
     private fun Folder.filteredMirror(cloudId: Long, pinned: Boolean, mediaFilter: MediaFilter): Folder? {
@@ -93,6 +98,7 @@ internal class AlbumMirrors(
         val cover = items.asReversed().maxByOrNull(MediumEntity::dateTaken) ?: return null
         return copy(
             bucketId = cloudId, isPinned = pinned, itemCount = items.size, size = items.sumOf(MediumEntity::size),
+            localBucketId = bucketId,
             dateTaken = cover.dateTaken, dateModified = items.maxOf(MediumEntity::dateModified),
             coverId = cover.id, coverType = cover.type,
             manualCover = manualCover?.takeIf { uri -> items.any { mediaUri(it.id, MediaType.entries[it.type]) == uri } },

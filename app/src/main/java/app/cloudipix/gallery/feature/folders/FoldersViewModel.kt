@@ -14,6 +14,7 @@ import app.cloudipix.gallery.core.model.SortKey
 import app.cloudipix.gallery.core.model.Sorting
 import app.cloudipix.gallery.core.model.firstInSortOrder
 import app.cloudipix.gallery.core.model.isVirtualFolder
+import app.cloudipix.gallery.core.model.manualSortPosition
 import app.cloudipix.gallery.core.model.recent
 import app.cloudipix.gallery.core.model.sortedBy
 import app.cloudipix.gallery.core.settings.GallerySettings
@@ -119,7 +120,8 @@ class FoldersViewModel @Inject constructor(
         val ordered = if (manualSort) {
             val positions = (draft?.order ?: config.folderOrder).withIndex().associate { it.value to it.index }
             autoSorted.sortedBy { folder ->
-                positions[folder.bucketId] ?: if (folder.isFavorites) Int.MIN_VALUE else Int.MAX_VALUE
+                val position = if (draft == null) folder.manualSortPosition(positions) else positions[folder.bucketId]
+                position ?: if (folder.isFavorites) Int.MIN_VALUE else Int.MAX_VALUE
             }
         } else autoSorted
         val sorted = ordered.sortedByDescending(Folder::isPinned)
@@ -208,7 +210,7 @@ class FoldersViewModel @Inject constructor(
 
     suspend fun moveSelectedToTab(from: String, to: String): Boolean {
         val ids = state.value?.selected.orEmpty()
-        val moved = settings.moveFoldersToTab(ids, from, to)
+        val moved = settings.moveFoldersToTab(ids, from, to, localByCloud = localIdsByCloud())
         if (moved) clearSelection()
         return moved
     }
@@ -229,7 +231,10 @@ class FoldersViewModel @Inject constructor(
     }
 
     fun pinSelected() = viewModelScope.launch {
-        repository.setPinned(selected.value.filterNot(::isVirtualFolder), pin = state.value?.selectionPinned == false)
+        val ids = selected.value.filterNot(::isVirtualFolder)
+        val pin = state.value?.selectionPinned == false
+        val localIds = if (pin) emptyList() else ids.mapNotNull(localIdsByCloud()::get)
+        repository.setPinned(ids + localIds, pin)
         clearSelection()
     }
 
@@ -278,11 +283,12 @@ class FoldersViewModel @Inject constructor(
             dragOrder.value = null
             return
         }
+        val localByCloud = localIdsByCloud()
         viewModelScope.launch {
             try {
                 if (from == to) {
-                    if (order != null) settings.saveFolderOrder(order)
-                } else if (!settings.moveFoldersToTab(setOf(bucketId), from, to, order)) {
+                    if (order != null) settings.saveFolderOrder(order, localByCloud)
+                } else if (!settings.moveFoldersToTab(setOf(bucketId), from, to, order, localByCloud)) {
                     onFailure()
                 }
             } catch (_: IOException) {
@@ -291,6 +297,10 @@ class FoldersViewModel @Inject constructor(
                 dragOrder.value = null
             }
         }
+    }
+
+    private fun localIdsByCloud(): Map<Long, Long> = buildMap {
+        for (folder in loaded) folder.localBucketId?.let { put(folder.bucketId, it) }
     }
 
     fun cycleFilter() = viewModelScope.launch {

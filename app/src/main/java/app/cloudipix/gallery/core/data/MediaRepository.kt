@@ -294,6 +294,7 @@ class MediaRepository @Inject constructor(
                 entry.copy(
                     itemCount = album?.photos.orEmpty().size + mirrors.localAdditions(entry.bucketId, album, MediaFilter.All).size,
                     syncLocalPath = localPaths[entry.bucketId]?.let(LocalStoragePath::absolute),
+                    localBucketId = mirrors.localByCloud[entry.bucketId],
                 )
             }
             val known = present.map(FolderEntry::bucketId).toHashSet()

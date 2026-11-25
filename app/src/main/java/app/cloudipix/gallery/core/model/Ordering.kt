@@ -71,6 +71,9 @@ fun <T : Sortable> List<T>.sortedBy(sorting: Sorting): List<T> {
     return if (sorting.descending) ordered.asReversed() else ordered
 }
 
+internal fun Folder.manualSortPosition(positions: Map<Long, Int>): Int? =
+    localBucketId?.let(positions::get) ?: positions[bucketId]
+
 internal fun <T : Sortable> List<T>.firstInSortOrder(sorting: Sorting): T? {
     val order = sorting.key.comparator<T>()
     // 내림차순은 오름차순 목록을 뒤집으므로 값이 같으면 마지막 항목을 고른다.

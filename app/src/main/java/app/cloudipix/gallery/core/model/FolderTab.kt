@@ -12,3 +12,6 @@ data class FolderTab(
         val Home = FolderTab("home", "")
     }
 }
+
+internal fun Set<Long>.containsFolder(bucketId: Long, localBucketId: Long?): Boolean =
+    bucketId in this || localBucketId?.let(this::contains) == true

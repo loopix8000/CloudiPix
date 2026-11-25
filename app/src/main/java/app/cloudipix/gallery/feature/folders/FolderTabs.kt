@@ -69,6 +69,7 @@ import app.cloudipix.gallery.R
 import app.cloudipix.gallery.core.model.FAVORITES_BUCKET_ID
 import app.cloudipix.gallery.core.model.FolderEntry
 import app.cloudipix.gallery.core.model.FolderTab
+import app.cloudipix.gallery.core.model.containsFolder
 import app.cloudipix.gallery.ui.component.CheckBox
 import app.cloudipix.gallery.ui.component.DialogButtons
 import app.cloudipix.gallery.ui.component.DialogCard
@@ -414,10 +415,11 @@ private fun EditFolderTab(
                 }
             }
             items(folders, key = { it.bucketId }) { folder ->
-                val checked = folder.bucketId in picked
+                val checked = picked.containsFolder(folder.bucketId, folder.localBucketId)
                 Row(
                     Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Checkbox) { on ->
-                        picked = if (on) picked + folder.bucketId else picked - folder.bucketId
+                        picked = if (on) picked + folder.bucketId
+                        else picked - listOfNotNull(folder.bucketId, folder.localBucketId)
                     }.heightIn(min = GalleryTheme.hitTarget),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),

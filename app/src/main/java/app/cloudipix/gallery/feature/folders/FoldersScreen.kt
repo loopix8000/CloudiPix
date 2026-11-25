@@ -67,6 +67,7 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.cloudipix.gallery.core.model.Folder
 import app.cloudipix.gallery.core.model.FolderTab
+import app.cloudipix.gallery.core.model.containsFolder
 import app.cloudipix.gallery.core.settings.GallerySettings
 import app.cloudipix.gallery.ui.component.CloudFolderIcon
 import app.cloudipix.gallery.core.sync.AlbumSyncState
@@ -159,11 +160,13 @@ fun FoldersScreen(
         tabs.map { tab ->
             if (tab.id == FolderTab.Home.id) {
                 labeledFolders.filter {
-                    it.isRecent || it.bucketId !in assigned || (previewTab == tab.id && it.bucketId == held?.id)
+                    it.isRecent || !assigned.containsFolder(it.bucketId, it.localBucketId) ||
+                        (previewTab == tab.id && it.bucketId == held?.id)
                 }
             } else {
                 labeledFolders.filter {
-                    !it.isRecent && (it.bucketId in tab.folderIds || (previewTab == tab.id && it.bucketId == held?.id))
+                    !it.isRecent && (tab.folderIds.containsFolder(it.bucketId, it.localBucketId) ||
+                        (previewTab == tab.id && it.bucketId == held?.id))
                 }
             }
         }
