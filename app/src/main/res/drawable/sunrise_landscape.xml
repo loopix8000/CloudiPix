@@ -7,10 +7,10 @@
     android:viewportHeight="432">
     <group android:scaleX="1.265934" android:scaleY="1.265934"
         android:translateX="59.973626" android:translateY="56.175824">
-        <path android:pathData="M155,94A48,48 0,1 1,155 190A48,48 0,1 1,155 94Z">
+        <path android:pathData="M156,93A48,48 0,1 1,156 189A48,48 0,1 1,156 93Z">
             <aapt:attr name="android:fillColor">
-                <gradient android:startX="177" android:startY="96"
-                    android:endX="156" android:endY="152"
+                <gradient android:startX="178" android:startY="95"
+                    android:endX="157" android:endY="151"
                     android:startColor="#FFC78C" android:endColor="#FFECB5" android:type="linear" />
             </aapt:attr>
         </path>
