@@ -47,7 +47,8 @@ internal class AlbumThumbnails {
 
 /**
  * 화면에 보이는 칸 수를 한 페이지로 삼아 앞뒤 한 페이지의 작은 미리보기만 보관한다.
- * 보이는 칸의 고화질 썸네일이 디스크에 이미 있으면 작은 미리보기 대신 칸 크기로 바로 읽어 메모리에 올린다.
+ * 고화질 썸네일이 디스크에 이미 있으면 작은 미리보기 대신 칸 크기로 바로 읽어 메모리에 올린다.
+ * 앞뒤 페이지도 같은 방법으로 미리 읽어 두어, 스크롤로 들어오는 줄이 미리보기 단계 없이 바로 그려지게 한다.
  */
 @Composable
 internal fun rememberAlbumThumbnails(
@@ -123,8 +124,9 @@ internal fun rememberAlbumThumbnails(
                 if (available <= 0) break
                 if (uri in running || !needsPreview(uri, misses)) continue
                 val indexed = known[uri]?.indexedMedia
-                // 고화질 차례가 아직 오지 않은 보이는 칸만 디스크를 먼저 본다. 차례가 온 칸은 고화질 요청이 직접 읽는다.
-                val cell = cellSize?.takeIf { !prefetch && uri !in album.full && it.width > 0 && it.height > 0 }
+                // 고화질 차례가 아직 오지 않은 칸은 디스크를 먼저 본다. 차례가 온 보이는 칸은 고화질 요청이 직접 읽는다.
+                // 앞뒤 페이지는 차례가 오지 않으므로 항상 먼저 보며, 메모리 캐시의 최근 항목으로 남아 화면에 들어올 때 바로 쓴다.
+                val cell = cellSize?.takeIf { uri !in album.full && it.width > 0 && it.height > 0 }
                 val job = launch {
                     if (cell != null) {
                         // 고화질 요청과 같은 키·크기로 읽어 메모리에 두면 고화질 칸이 바로 그려지고 같은 파일을 두 번 디코딩하지 않는다.
