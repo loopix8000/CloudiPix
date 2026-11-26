@@ -1,6 +1,6 @@
 package app.cloudipix.gallery.ui.component
 
-import android.graphics.Matrix
+import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import androidx.compose.foundation.layout.Box
@@ -8,12 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -21,6 +19,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.withSave
 import app.cloudipix.gallery.R
 import app.cloudipix.gallery.core.settings.GallerySettings
 import app.cloudipix.gallery.core.sync.AlbumSyncState
@@ -47,8 +46,23 @@ private val CloudCheckPath = PathParser()
     .toPath()
     .asAndroidPath()
 
-// 흰 배경 썸네일에서도 윤곽이 보이도록 회색빛이 살짝 도는 흰색을 불투명도 80%로 쓴다.
-internal const val CLOUD_ICON_ARGB = 0xCCDCDDE1.toInt()
+private val CloudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    style = Paint.Style.STROKE
+    strokeWidth = 2f
+    strokeCap = Paint.Cap.ROUND
+    strokeJoin = Paint.Join.ROUND
+    // 흰 배경 썸네일에서도 윤곽이 보이도록 회색빛이 살짝 도는 흰색을 불투명도 80%로 쓴다.
+    color = 0xCCDCDDE1.toInt()
+    setShadowLayer(2.5f, 0f, 1.5f, 0x66000000)
+}
+
+internal fun Canvas.drawCloudFolderGlyph(path: Path, x: Float, y: Float, size: Float) {
+    withSave {
+        translate(x, y)
+        scale(size / 24f, size / 24f)
+        drawPath(path, CloudPaint)
+    }
+}
 
 internal fun cloudFolderGlyph(syncState: AlbumSyncState?) = when (syncState) {
     AlbumSyncState.Syncing -> CloudSyncPath to R.string.sync_notification_title
@@ -76,18 +90,8 @@ internal fun CloudFolderIcon(
                 contentDescription = description
                 role = Role.Image
             }
-            .drawWithCache {
-                val scale = Matrix().apply { setScale(size.width / 24f, size.height / 24f) }
-                val path = Path().also { icon.transform(scale, it) }
-                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    style = Paint.Style.STROKE
-                    strokeWidth = size.minDimension * (2f / 24f)
-                    strokeCap = Paint.Cap.ROUND
-                    strokeJoin = Paint.Join.ROUND
-                    color = CLOUD_ICON_ARGB
-                    setShadowLayer(1.25.dp.toPx(), 0f, 0.75.dp.toPx(), Color.Black.copy(alpha = 0.4f).toArgb())
-                }
-                onDrawBehind { drawIntoCanvas { it.nativeCanvas.drawPath(path, paint) } }
+            .drawBehind {
+                drawIntoCanvas { it.nativeCanvas.drawCloudFolderGlyph(icon, 0f, 0f, size.minDimension) }
             },
     )
 }

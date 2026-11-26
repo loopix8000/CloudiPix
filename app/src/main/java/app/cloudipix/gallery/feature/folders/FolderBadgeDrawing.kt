@@ -9,8 +9,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.graphics.vector.toPath
 import androidx.core.graphics.withSave
-import app.cloudipix.gallery.ui.component.CLOUD_ICON_ARGB
 import app.cloudipix.gallery.ui.component.GalleryIcons
+import app.cloudipix.gallery.ui.component.drawCloudFolderGlyph
 import app.cloudipix.gallery.ui.theme.FavoriteRed
 
 private fun ImageVector.singlePath() = (root[0] as VectorPath).pathData.toPath().asAndroidPath()
@@ -36,13 +36,13 @@ internal fun Canvas.drawFolderBadges(
         brush.style = Paint.Style.FILL
         drawCircle(x, y, radius, brush)
     }
-    fun glyph(path: Path, x: Float, y: Float, size: Float, color: Int, filled: Boolean = false, viewport: Float = 20f) {
+    fun glyph(path: Path, x: Float, y: Float, size: Float, color: Int, filled: Boolean = false) {
         withSave {
             translate(x, y)
-            scale(size / viewport, size / viewport)
+            scale(size / 20f, size / 20f)
             brush.color = color
             brush.style = if (filled) Paint.Style.FILL else Paint.Style.STROKE
-            brush.strokeWidth = if (viewport == 24f) 2f else 1.5f
+            brush.strokeWidth = 1.5f
             drawPath(path, brush)
         }
     }
@@ -53,7 +53,7 @@ internal fun Canvas.drawFolderBadges(
             edge, FavoriteRed.toArgb(), filled = true)
     }
     if (state.locked) glyph(lock, (width - 22f) / 2, (width - 22f) / 2, 22f, 0xd1ffffff.toInt())
-    state.cloud?.let { glyph(it, start(if (state.selecting) 28f else 6f, 12f), 6f, 12f, CLOUD_ICON_ARGB, viewport = 24f) }
+    state.cloud?.let { drawCloudFolderGlyph(it, start(if (state.selecting) 28f else 6f, 12f), 6f, 12f) }
     fun statusBadge(path: Path, top: Float) {
         val x = end(5f, 20f)
         circle(x + 10f, top + 10f, 10f, 0x8c000000.toInt())
