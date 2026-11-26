@@ -86,6 +86,8 @@ import app.cloudipix.gallery.ui.component.MediaThumbnail
 import app.cloudipix.gallery.ui.component.PullToRefresh
 import app.cloudipix.gallery.ui.component.VolumeGridScroll
 import app.cloudipix.gallery.ui.component.rememberGridRangeDrag
+import app.cloudipix.gallery.ui.component.rememberScrollEdgeBlur
+import app.cloudipix.gallery.ui.component.scrollEdgeBlur
 import app.cloudipix.gallery.ui.component.selectGridRange
 import app.cloudipix.gallery.ui.formatCount
 import app.cloudipix.gallery.ui.formatDuration
@@ -131,6 +133,7 @@ fun MediaScreen(
     BackHandler(enabled = state.selecting, onBack = viewModel::clearSelection)
 
     val gridState = rememberLazyGridState()
+    val scrollBlur = rememberScrollEdgeBlur()
     val thumbnails = rememberAlbumThumbnails(gridState, items, if (state.choosingCover && state.loaded) 1 else 0)
     var scrolledFor by rememberSaveable { mutableStateOf<ScrollDirection?>(null) }
     val gap = settings.thumbnailSpacing.gap
@@ -233,6 +236,7 @@ fun MediaScreen(
                     onHold = if (state.choosingCover) null else viewModel::beginRange,
                 )
                 .gridPinchZoom(!state.selecting, viewModel::zoomGrid)
+                .scrollEdgeBlur(scrollBlur)
             LazyVerticalGrid(
                 columns = galleryGridCells(settings.mediaColumns, gap),
                 modifier = gridGestures,
