@@ -13,7 +13,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -185,7 +184,6 @@ internal fun ViewerScreen(
     photoTransition: @Composable (Long) -> Modifier = { Modifier },
     entering: Boolean = false,
     leaving: Boolean = false,
-    returningToGrid: Boolean = false,
     photoInMotion: Boolean = false,
     viewModel: ViewerViewModel = hiltViewModel(),
 ) {
@@ -349,9 +347,6 @@ internal fun ViewerScreen(
         }
     }
     val sharedPhoto = if (exit == null) photoPreview(current) else exit.photo
-    // 사진이 칸으로 돌아오는 동안 앨범을 바로 드러내고 뷰어 배경과 조작 막대를 걷는다.
-    val revealGrid = returningToGrid && sharedPhoto != null
-    val showChrome = chrome && chromeMedium != null && !revealGrid
     var initialPhotoDisplayed by remember(initialPreview) { mutableStateOf(false) }
     val waitingForInitialPhoto = initialPreview != null && sharedPhoto == initialPreview &&
         !initialPhotoDisplayed && pagerState?.isScrollInProgress != true
@@ -386,7 +381,7 @@ internal fun ViewerScreen(
         Modifier
             .fillMaxSize()
             .onSizeChanged { viewport = it }
-            .then(if (revealGrid) Modifier else Modifier.background(GalleryTheme.colors.background))
+            .background(GalleryTheme.colors.background)
             .verticalSwipe(enabled = { !locked }, onDrag = ::followSwipe, onRelease = ::finishSwipe),
     ) {
         Box(
@@ -422,7 +417,7 @@ internal fun ViewerScreen(
                 )
             }
             if (pagerState == null || (openingPhoto && sphere != null)) return@photo
-            val hidePager = openingPhoto || revealGrid || (photoInMotion && sharedPhoto != null)
+            val hidePager = openingPhoto || (photoInMotion && sharedPhoto != null)
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
@@ -506,9 +501,9 @@ internal fun ViewerScreen(
         }
 
         AnimatedVisibility(
-            visible = showChrome,
+            visible = chrome && chromeMedium != null,
             enter = fadeIn() + slideInVertically { -it / 3 },
-            exit = if (revealGrid) ExitTransition.None else fadeOut() + slideOutVertically { -it / 3 },
+            exit = fadeOut() + slideOutVertically { -it / 3 },
             modifier = Modifier.align(Alignment.TopCenter).then(chromeOverlay),
         ) {
             val medium = chromeMedium ?: return@AnimatedVisibility
@@ -526,9 +521,9 @@ internal fun ViewerScreen(
         }
 
         AnimatedVisibility(
-            visible = showChrome && info,
+            visible = chrome && info && chromeMedium != null,
             enter = fadeIn(),
-            exit = if (revealGrid) ExitTransition.None else fadeOut(),
+            exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter).padding(
                 bottom = if (chromeMedium?.type == MediaType.Video) {
                     bottomBarHeight + VIDEO_CONTROLS_HEIGHT + 12.dp
@@ -542,9 +537,9 @@ internal fun ViewerScreen(
         }
 
         AnimatedVisibility(
-            visible = showChrome,
+            visible = chrome && chromeMedium != null,
             enter = fadeIn() + slideInVertically { it / 3 },
-            exit = if (revealGrid) ExitTransition.None else fadeOut() + slideOutVertically { it / 3 },
+            exit = fadeOut() + slideOutVertically { it / 3 },
             modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { size ->
                 if (size.height > 0) bottomBarHeight = with(density) { size.height.toDp() }
             }.then(chromeOverlay),
