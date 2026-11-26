@@ -317,6 +317,7 @@ fun GalleryNavHost(
                     val removed = entry.id == instantExitEntryId
                     val visibility = this
                     val route = entry.toRoute<Viewer>()
+                    val leaving = !removed && visibility.transition.targetState == EnterExitState.PostExit
                     GalleryScreenTheme(ThemeMode.Black) {
                         FolderAccessGate(route.bucketId, onBack = back) {
                             val opening = openingPhoto?.takeIf { it.route == route }
@@ -350,7 +351,8 @@ fun GalleryNavHost(
                                     }
                                 },
                                 entering = visibility.transition.currentState == EnterExitState.PreEnter,
-                                leaving = !removed && visibility.transition.targetState == EnterExitState.PostExit,
+                                leaving = leaving,
+                                returningToGrid = leaving && route.previewUri != null && currentEntry?.isPhotoGrid() == true,
                                 photoInMotion = !removed && sharedScene.isTransitionActive,
                             )
                         }
