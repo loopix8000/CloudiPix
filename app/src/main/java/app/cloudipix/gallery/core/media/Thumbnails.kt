@@ -27,6 +27,7 @@ import coil3.memory.MemoryCache
 import coil3.request.ImageRequest
 import coil3.request.Options
 import coil3.request.SuccessResult
+import coil3.request.bitmapConfig
 import coil3.request.crossfade
 import coil3.size.Scale
 import coil3.size.pxOrElse
@@ -124,8 +125,8 @@ class ThumbnailFetcher internal constructor(
     )
 
     override suspend fun fetch(): FetchResult {
-        if (data.embedded) return sampled(fetchEmbedded())
-        if (data.cachedOnly) return sampled(fetchCached())
+        if (data.embedded) return sampled(fetchEmbedded(), owned = true)
+        if (data.cachedOnly) return sampled(fetchCached(), owned = true)
         if (data.uri.scheme == REMOTE_MEDIA_SCHEME) {
             return sampled(remoteImages.thumbnail(data.uri, target))
         }
@@ -184,8 +185,23 @@ class ThumbnailFetcher internal constructor(
         }
     }
 
-    private fun sampled(bitmap: Bitmap): FetchResult =
-        ImageFetchResult(bitmap.asImage(), isSampled = true, dataSource = DataSource.DISK)
+    /**
+     * [owned]이면 [bitmap]을 다른 곳에서 쓰지 않아 하드웨어 비트맵으로 바꾼 뒤 바로 해제할 수 있다.
+     * 디스크 캐시에 새로 만든 썸네일은 기록이 끝날 때까지 원래 비트맵을 쓰므로 해제하지 않는다.
+     */
+    private fun sampled(bitmap: Bitmap, owned: Boolean = false): FetchResult =
+        ImageFetchResult(bitmap.forDisplay(owned).asImage(), isSampled = true, dataSource = DataSource.DISK)
+
+    /**
+     * 요청이 허용하면 하드웨어 비트맵으로 바꾼다. 처음 그릴 때 렌더 스레드가 하던 GPU 업로드를 이 작업 스레드에서 끝낸다.
+     * 변환이 있거나 소프트웨어 비트맵을 요구한 요청은 Coil이 비트맵 설정을 ARGB_8888로 주므로 그대로 둔다.
+     */
+    private fun Bitmap.forDisplay(owned: Boolean): Bitmap {
+        if (options.bitmapConfig != Bitmap.Config.HARDWARE || config == Bitmap.Config.HARDWARE) return this
+        val hardware = copy(Bitmap.Config.HARDWARE, false) ?: return this
+        if (owned) recycle()
+        return hardware
+    }
 
     private fun decodeFromOriginal(wanted: ThumbnailTarget): Bitmap? = try {
         decodeThumbnail(ImageDecoder.createSource(context.contentResolver, data.uri), wanted.size, wanted.fill)
