@@ -3,7 +3,11 @@ package app.cloudipix.gallery.feature.folders
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import android.net.Uri
 import app.cloudipix.gallery.core.data.MediaRepository
+import app.cloudipix.gallery.core.media.IndexedMedia
+import app.cloudipix.gallery.core.media.ThumbnailPrewarmer
+import app.cloudipix.gallery.core.media.indexedMedia
 import app.cloudipix.gallery.core.model.FAVORITES_BUCKET_ID
 import app.cloudipix.gallery.core.model.Folder
 import app.cloudipix.gallery.core.model.FolderTab
@@ -22,6 +26,10 @@ import app.cloudipix.gallery.core.settings.SettingsRepository
 import app.cloudipix.gallery.core.settings.sortingFor
 import app.cloudipix.gallery.core.remote.isRemoteId
 import app.cloudipix.gallery.core.sync.FolderSync
+import app.cloudipix.gallery.feature.media.albumQuery
+import app.cloudipix.gallery.feature.media.firstAlbumPage
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -79,6 +87,7 @@ class FoldersViewModel @Inject constructor(
     private val repository: MediaRepository,
     private val settings: SettingsRepository,
     private val folderSync: FolderSync,
+    private val prewarmer: ThumbnailPrewarmer,
 ) : ViewModel() {
 
     private val selected = MutableStateFlow(emptySet<Long>())
@@ -178,6 +187,29 @@ class FoldersViewModel @Inject constructor(
 
     /** 모든 폴더를 다시 읽습니다. 이미 읽는 중이면 무시합니다. */
     internal suspend fun refreshVisibleFolders(bucketIds: Set<Long>) = repository.refreshVisibleFolders(bucketIds)
+
+    /**
+     * [folders]를 열었을 때 첫 화면에 보일 기기 사진의 썸네일을 폴더 순서대로 미리 만듭니다. 칸은 [cellPx] 크기이고
+     * 폴더마다 [cells]개입니다. 폴더 표지가 먼저 불러와지도록 잠시 기다린 뒤 시작하며, 폴더 목록을 벗어나면 호출한 쪽이 취소합니다.
+     * 서버 사진은 내려받아야 하므로 만들지 않고, 잠긴 폴더는 건너뜁니다.
+     */
+    internal suspend fun prewarmFirstPages(folders: List<Folder>, cellPx: Int, cells: Int) {
+        delay(PREWARM_DELAY_MS)
+        val config = settings.settings.first()
+        val items = withContext(Dispatchers.Default) {
+            val seen = HashSet<Uri>()
+            val pages = ArrayList<Pair<Uri, IndexedMedia>>()
+            for (folder in folders.asSequence().filterNot(Folder::isLocked).take(MAX_PREWARM_FOLDERS)) {
+                val query = albumQuery(config, folder.bucketId)
+                for (medium in repository.mediaIn(folder.bucketId, query.filter).first().firstAlbumPage(query, cells)) {
+                    val indexed = medium.indexedMedia ?: continue
+                    if (seen.add(medium.displayUri)) pages += medium.displayUri to indexed
+                }
+            }
+            pages
+        }
+        prewarmer.prewarm(items, cellPx)
+    }
 
     fun refresh() {
         if (refreshing.value) return
@@ -329,6 +361,11 @@ class FoldersViewModel @Inject constructor(
         settings.setMediaFilter(filters[(filters.indexOf(current) + 1) % filters.size])
     }
 }
+
+// 폴더 목록을 연 직후에는 폴더 표지가 썸네일 작업 스레드를 먼저 쓰게 한다.
+private const val PREWARM_DELAY_MS = 1_500L
+// 목록 앞쪽 폴더일수록 열 가능성이 높다. 화면 몇 장 분량의 폴더까지만 미리 만든다.
+private const val MAX_PREWARM_FOLDERS = 30
 
 private data class FolderAlbums(val folders: List<Folder>, val favorites: Folder, val recent: Folder?)
 

@@ -145,11 +145,9 @@ class ThumbnailFetcher internal constructor(
 
     private suspend fun fetchLocal(): FetchResult {
         val cached = thumbnails.get(cacheKey(), target) { wanted ->
-            // 시스템 썸네일은 EXIF에 든 128px 미리보기를 다시 압축한 것일 수 있어 사진은 원본에서 직접 만듭니다.
             val isImage = data.indexed?.let { !it.video }
                 ?: (context.contentResolver.getType(data.uri)?.startsWith("image/") == true)
-            val decoded = if (isImage) decodeFromOriginal(wanted) else null
-            decoded ?: loadSystemThumbnail(wanted)
+            createLocalThumbnail(context, data.uri, isImage, wanted)
         }
         return if (cached != null) sampled(cached) else originalSource()
     }
@@ -180,7 +178,7 @@ class ThumbnailFetcher internal constructor(
                 }
             }
             // 시스템 썸네일은 미디어 저장소 항목만 저장소가 따로 보관하므로 그 밖의 제공자에는 쓰지 않습니다.
-            val quick = embedded ?: if (data.uri.authority == MediaStore.AUTHORITY) loadSystemThumbnail(target) else null
+            val quick = embedded ?: if (data.uri.authority == MediaStore.AUTHORITY) loadSystemThumbnail(context, data.uri, target) else null
             quick ?: throw IOException("빠르게 보여 줄 썸네일이 없습니다.")
         }
     }
@@ -203,19 +201,13 @@ class ThumbnailFetcher internal constructor(
         return hardware
     }
 
-    private fun decodeFromOriginal(wanted: ThumbnailTarget): Bitmap? = try {
-        decodeThumbnail(ImageDecoder.createSource(context.contentResolver, data.uri), wanted.size, wanted.fill)
-    } catch (_: IOException) {
-        null
-    }
-
     /**
      * 디스크 캐시 키입니다. 사진을 편집하거나 회전하면 MediaStore의 수정 세대가 바뀌어 키도 바뀝니다.
      * 색인에서 버전을 받았으면 그 값을 쓰고, 아니면 미디어 저장소에서 읽습니다.
      * MediaStore가 아닌 제공자는 수정 여부를 알 수 없어 `null`을 돌려 캐시하지 않습니다.
      */
     private fun cacheKey(): String? {
-        data.indexed?.let { return "${data.uri}|${it.version}" }
+        data.indexed?.let { return localThumbnailKey(data.uri, it) }
         val projection = arrayOf(
             MediaStore.MediaColumns.GENERATION_MODIFIED,
             MediaStore.MediaColumns.DATE_MODIFIED,
@@ -230,19 +222,6 @@ class ThumbnailFetcher internal constructor(
             null
         }
         return version?.let { "${data.uri}|$it" }
-    }
-
-    /** 요청이 취소되면 시스템 썸네일 생성도 함께 취소합니다. */
-    private suspend fun loadSystemThumbnail(wanted: ThumbnailTarget): Bitmap? {
-        val signal = CancellationSignal()
-        val cancelOnCompletion = coroutineContext[Job]?.invokeOnCompletion { signal.cancel() }
-        return try {
-            context.contentResolver.loadThumbnail(data.uri, wanted.size, signal).scaleAndRecycle(wanted.size, wanted.fill)
-        } catch (_: IOException) {
-            null
-        } finally {
-            cancelOnCompletion?.dispose()
-        }
     }
 
     private fun originalSource(): FetchResult {
@@ -264,6 +243,40 @@ class ThumbnailFetcher internal constructor(
 
         override fun create(data: Thumbnail, options: Options, imageLoader: ImageLoader): Fetcher =
             ThumbnailFetcher(appContext, data, options, storage.local, remoteImages)
+    }
+}
+
+/** 색인 버전을 아는 기기 항목의 디스크 캐시 키입니다. [ThumbnailFetcher]가 미디어 저장소에서 읽어 만드는 키와 같습니다. */
+internal fun localThumbnailKey(uri: Uri, indexed: IndexedMedia): String = "$uri|${indexed.version}"
+
+/**
+ * 기기 항목의 원본 구도 썸네일을 [wanted] 크기로 만듭니다.
+ * 시스템 썸네일은 EXIF에 든 128px 미리보기를 다시 압축한 것일 수 있어 사진은 원본에서 직접 만듭니다.
+ * 동영상이거나 원본을 디코딩하지 못하면 시스템 썸네일을 씁니다.
+ */
+internal suspend fun createLocalThumbnail(context: Context, uri: Uri, isImage: Boolean, wanted: ThumbnailTarget): Bitmap? {
+    val decoded = if (isImage) {
+        try {
+            decodeThumbnail(ImageDecoder.createSource(context.contentResolver, uri), wanted.size, wanted.fill)
+        } catch (_: IOException) {
+            null
+        }
+    } else {
+        null
+    }
+    return decoded ?: loadSystemThumbnail(context, uri, wanted)
+}
+
+/** 요청이 취소되면 시스템 썸네일 생성도 함께 취소합니다. */
+private suspend fun loadSystemThumbnail(context: Context, uri: Uri, wanted: ThumbnailTarget): Bitmap? {
+    val signal = CancellationSignal()
+    val cancelOnCompletion = coroutineContext[Job]?.invokeOnCompletion { signal.cancel() }
+    return try {
+        context.contentResolver.loadThumbnail(uri, wanted.size, signal).scaleAndRecycle(wanted.size, wanted.fill)
+    } catch (_: IOException) {
+        null
+    } finally {
+        cancelOnCompletion?.dispose()
     }
 }
 

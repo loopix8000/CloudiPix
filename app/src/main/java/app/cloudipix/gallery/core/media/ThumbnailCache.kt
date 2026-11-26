@@ -120,6 +120,20 @@ internal class ThumbnailCache(private val disk: LimitedDiskCache) {
         return withContext(embeddedThumbnailDispatcher) { disk.use { it.read(key, target.stored(), target) } }
     }
 
+    /** [key]에 [target]을 덮는 현재 형식의 미리보기가 있는지 이미지는 읽지 않고 확인한다. */
+    suspend fun contains(key: String, target: ThumbnailTarget): Boolean = withContext(embeddedThumbnailDispatcher) {
+        disk.use { cache ->
+            try {
+                cache.openSnapshot(key)?.use { snapshot ->
+                    val preview = StoredPreview.parse(cache.fileSystem.read(snapshot.metadata) { readUtf8() })
+                    preview != null && preview.current && preview.covers(target.stored())
+                } == true
+            } catch (_: IOException) {
+                false
+            }
+        }
+    }
+
     /** 같은 칸의 고화질 요청이 이미 진행 중이면 현재 디스크 캐시를 두 번 디코딩하지 않는다. */
     suspend fun readQuickPreview(key: String?, target: ThumbnailTarget, useCachedPreview: Boolean): Bitmap? {
         if (key == null) return null

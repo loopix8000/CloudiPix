@@ -180,13 +180,7 @@ class MediaViewModel @Inject constructor(
                 MediaUiState(title = route.title, virtual = virtual, choosingCover = route.chooseCover),
             )
 
-    /** 표지를 고를 때는 사진만 보여 줍니다. */
-    private fun queryFor(config: GallerySettings) = AlbumQuery(
-        filter = if (route.chooseCover) MediaFilter.Images else config.mediaFilter,
-        sorting = config.sortingFor(bucketId),
-        grouping = config.groupingFor(bucketId),
-        scrollDirection = config.scrollDirection,
-    )
+    private fun queryFor(config: GallerySettings) = albumQuery(config, bucketId, route.chooseCover)
 
     internal suspend fun refreshVisibleFolder() {
         if (!isRemoteId(bucketId)) return
@@ -302,12 +296,29 @@ class MediaViewModel @Inject constructor(
 }
 
 /** 목록을 다시 정렬해야 하는 설정 조합입니다. 이 값이 같으면 정렬 결과도 같습니다. */
-private data class AlbumQuery(
+internal data class AlbumQuery(
     val filter: MediaFilter,
     val sorting: Sorting,
     val grouping: Grouping,
     val scrollDirection: ScrollDirection,
 )
+
+/** [bucketId] 폴더 화면이 쓰는 정렬 기준입니다. 표지를 고를 때는 사진만 보여 줍니다. */
+internal fun albumQuery(config: GallerySettings, bucketId: Long, chooseCover: Boolean = false) = AlbumQuery(
+    filter = if (chooseCover) MediaFilter.Images else config.mediaFilter,
+    sorting = config.sortingFor(bucketId),
+    grouping = config.groupingFor(bucketId),
+    scrollDirection = config.scrollDirection,
+)
+
+/**
+ * 폴더를 처음 열었을 때 보이는 [cells]개 항목입니다. 위로 쌓는 설정이면 맨 끝을 먼저 보여 주므로 마지막 항목들입니다.
+ * 날짜 머리글이 차지하는 줄은 빼지 않아 실제보다 조금 넉넉합니다.
+ */
+internal fun List<Medium>.firstAlbumPage(query: AlbumQuery, cells: Int): List<Medium> {
+    val shown = arrange(query).shown
+    return if (query.scrollDirection == ScrollDirection.Up) shown.takeLast(cells) else shown.take(cells)
+}
 
 /** 정렬·묶기를 마친 목록입니다. [shown]은 격자에 보이는 순서, [indexById]는 그 안의 위치입니다. */
 private class ArrangedMedia(

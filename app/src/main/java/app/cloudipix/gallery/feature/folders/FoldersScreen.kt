@@ -86,6 +86,7 @@ import app.cloudipix.gallery.ui.component.galleryGridCells
 import app.cloudipix.gallery.ui.component.gridPinchZoom
 import app.cloudipix.gallery.ui.component.OverflowMenu
 import app.cloudipix.gallery.ui.component.PullToRefresh
+import app.cloudipix.gallery.ui.component.rememberMediaGridPage
 import app.cloudipix.gallery.ui.component.VolumeGridScroll
 import app.cloudipix.gallery.feature.security.LocalGalleryAccess
 import app.cloudipix.gallery.ui.theme.DetailsPlacement
@@ -168,6 +169,7 @@ fun FoldersScreen(
             }
         }
     }
+    val mediaGridPage = rememberMediaGridPage(state.settings.mediaColumns, state.settings.thumbnailSpacing.gap)
     if (held == null && !pager.isScrollInProgress) {
         val settledPage = pager.settledPage.coerceIn(tabs.indices)
         val visibleFolders = pageFolders[settledPage]
@@ -177,6 +179,14 @@ fun FoldersScreen(
         LifecycleResumeEffect(tabs[settledPage].id, remoteBuckets) {
             val refresh = scope.launch { viewModel.refreshVisibleFolders(remoteBuckets) }
             onPauseOrDispose { refresh.cancel() }
+        }
+        // 폴더를 열기 전에 첫 화면의 썸네일을 만들어 둔다. 표지나 개수가 바뀔 때마다 다시 시작하지 않도록 폴더 순서로만 구분한다.
+        val folderIds = remember(visibleFolders) { visibleFolders.map { it.bucketId } }
+        LifecycleResumeEffect(tabs[settledPage].id, folderIds, mediaGridPage) {
+            val prewarm = mediaGridPage?.let { page ->
+                scope.launch { viewModel.prewarmFirstPages(visibleFolders, page.cellPx, page.cells) }
+            }
+            onPauseOrDispose { prewarm?.cancel() }
         }
     }
     var manageTabs by rememberSaveable { mutableStateOf(false) }
