@@ -573,6 +573,11 @@ class MediaRepository @Inject constructor(
         }
     }
 
+    internal suspend fun refreshVisibleFolders(bucketIds: Set<Long>, force: Boolean = false) =
+        remote.refreshVisibleFolders(bucketIds, force)
+
+    internal suspend fun refreshOpenedPhoto(uri: Uri, localCopyModified: Long?) = remote.refreshOpenedPhoto(uri, localCopyModified)
+
     suspend fun refresh(bucketIds: Set<Long>?): Unit = coroutineScope {
         if (bucketIds == null) launch { remote.refresh() }
         else bucketIds.filter(::isRemoteId).toSet().takeIf { it.isNotEmpty() }?.let { ids -> launch { remote.refresh(buckets = ids) } }

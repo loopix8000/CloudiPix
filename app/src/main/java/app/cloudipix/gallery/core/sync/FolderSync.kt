@@ -99,6 +99,7 @@ internal data class FolderSyncSettingsExport(
     val folders: List<SyncedFolderExport>,
     val cloudFolders: List<CloudFolderBackup>? = null,
     val fileFilters: SyncFileFilterSettings? = null,
+    val scheduledSyncEnabled: Boolean? = null,
 )
 
 @Serializable
@@ -144,6 +145,8 @@ class FolderSync @Inject internal constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val minutes = MutableStateFlow(StoredSyncPreferences().interval)
     internal val interval = minutes.asStateFlow()
+    private val scheduled = MutableStateFlow(StoredSyncPreferences().scheduledSyncEnabled)
+    internal val scheduledSyncEnabled = scheduled.asStateFlow()
     private val selectedConflictPolicy = MutableStateFlow(StoredSyncPreferences().conflictPolicy)
     internal val conflictPolicy = selectedConflictPolicy.asStateFlow()
     internal val fileFilters = store.fileFilters
@@ -176,6 +179,7 @@ class FolderSync @Inject internal constructor(
             val filters = store.preferences().fileFilters
             FolderSyncSettingsExport(
                 intervalMinutes = interval.value,
+                scheduledSyncEnabled = scheduled.value,
                 conflictPolicy = conflictPolicy.value,
                 defaultLocalPath = defaultRoot.value.label,
                 folders = servers.syncTargets().map { (server, folder, sync) ->
@@ -225,6 +229,7 @@ class FolderSync @Inject internal constructor(
         val servers = gallery.connectionsForSync()
         val savedRoot = restoredRoot ?: root.value
         val saved = store.preferences()
+        val restoredSchedule = backup.scheduledSyncEnabled ?: saved.scheduledSyncEnabled
         val restoredFilters = backup.fileFilters?.let { imported ->
             val mapped = imported.folders.mapNotNull { filter ->
                 cloud.serverIds[filter.serverId]?.let { filter.copy(serverId = it) }
@@ -233,14 +238,16 @@ class FolderSync @Inject internal constructor(
         } ?: saved.fileFilters
         store.savePreferences(saved.copy(
             interval = backup.intervalMinutes,
+            scheduledSyncEnabled = restoredSchedule,
             conflictPolicy = backup.conflictPolicy,
             defaultRoot = savedRoot.takeUnless { it == builtInRoot },
             fileFilters = restoredFilters,
         ))
         root.value = savedRoot
         minutes.value = backup.intervalMinutes
+        scheduled.value = restoredSchedule
         selectedConflictPolicy.value = backup.conflictPolicy
-        scheduler.schedule(backup.intervalMinutes, servers.any(RemoteServer::hasLinkedFolders))
+        scheduler.schedule(backup.intervalMinutes, servers.any(RemoteServer::hasLinkedFolders), restoredSchedule)
 
         var complete = cloud.complete
         val foldersByRoot = linkedMapOf<String, MutableList<SyncRestoreTarget>>()
@@ -358,12 +365,12 @@ class FolderSync @Inject internal constructor(
             }
         }
         minutes.value = saved.interval
+        scheduled.value = saved.scheduledSyncEnabled
         selectedConflictPolicy.value = saved.conflictPolicy
         preferencesLoaded = !retryHistory
     }
 
     fun onAppOpened() {
-        val requestedAt = System.currentTimeMillis()
         scope.launch {
             try {
                 operations.withLock {
@@ -373,13 +380,9 @@ class FolderSync @Inject internal constructor(
                         scheduler.enqueueCleanup()
                     }
                     loadPreferencesLocked()
-                    scheduler.schedule(minutes.value, hasLinkedFolders())
+                    scheduler.schedule(minutes.value, hasLinkedFolders(), scheduled.value)
                     updateMediaWatchLocked()
                     scheduleRestored = true
-                }
-                // 앱을 열 때마다 마지막 동기화 시각과 상관없이 동기화한다.
-                if (operations.withLock { configured().any { it.isVisibleSyncTarget() } }) {
-                    scheduler.enqueue(null, automatic = true, requestedAt = requestedAt)
                 }
             } catch (_: IOException) {
                 // 동기화 설정을 읽을 수 없어도 갤러리는 열 수 있다.
@@ -654,7 +657,17 @@ class FolderSync @Inject internal constructor(
             loadPreferencesLocked()
             store.savePreferences(store.preferences().copy(interval = value))
             minutes.value = value
-            scheduler.schedule(value, hasLinkedFolders())
+            scheduler.schedule(value, hasLinkedFolders(), scheduled.value)
+        }
+    }
+
+    internal suspend fun setScheduledSyncEnabled(enabled: Boolean) = withContext(Dispatchers.IO) {
+        operations.withLock {
+            loadPreferencesLocked()
+            if (scheduled.value == enabled) return@withLock
+            store.savePreferences(store.preferences().copy(scheduledSyncEnabled = enabled))
+            scheduled.value = enabled
+            scheduler.schedule(minutes.value, hasLinkedFolders(), enabled)
         }
     }
 
@@ -831,7 +844,10 @@ class FolderSync @Inject internal constructor(
                         (previousServers.linkedFolderIds() - servers.linkedFolderIds()).forEach(store::removeRuns)
                     }
                     val shouldSchedule = servers.any(RemoteServer::hasLinkedFolders)
-                    if (wasScheduled != shouldSchedule) scheduler.schedule(store.preferences().interval, shouldSchedule)
+                    if (wasScheduled != shouldSchedule) {
+                        val preferences = store.preferences()
+                        scheduler.schedule(preferences.interval, shouldSchedule, preferences.scheduledSyncEnabled)
+                    }
                 }
             }
         }
@@ -1007,17 +1023,14 @@ class FolderSync @Inject internal constructor(
     internal suspend fun run(
         id: String?,
         refreshCloudFolders: Boolean,
-        automatic: Boolean,
-        retrying: Boolean,
-        requestedAt: Long?,
         mediaToken: String?,
         subfolder: String?,
         beforeTransfer: suspend () -> Unit,
     ): SyncOutcome = withContext(Dispatchers.IO) {
         val ids = operations.withLock {
             loadPreferencesLocked()
-            configured().filter { it.isVisibleSyncTarget() }.map { it.sync.id }
-                .filter { (id == null || it == id) && (!automatic || isDue(it, retrying, requestedAt)) }
+            if (refreshCloudFolders && !scheduled.value) return@withContext SyncOutcome.Success
+            configured().filter { it.isVisibleSyncTarget() && (id == null || it.sync.id == id) }.map { it.sync.id }
         }
         if (ids.isEmpty()) {
             if (refreshCloudFolders) gallery.refresh()
@@ -1033,8 +1046,7 @@ class FolderSync @Inject internal constructor(
                     try {
                         val lock = operations.withLock { rootLocks.getOrPut(id) { Mutex() } }
                         lock.withLock {
-                            val result = runScheduledFolder(comparisons.root(id), automatic, retrying, refreshCloudFolders,
-                                requestedAt, mediaToken, subfolder, beforeTransfer)
+                            val result = runScheduledFolder(comparisons.root(id), refreshCloudFolders, mediaToken, subfolder, beforeTransfer)
                             result?.edits?.takeIf { it.isNotEmpty() }?.let { gallery.applyFileChanges(it) }
                             result
                         }
@@ -1057,21 +1069,13 @@ class FolderSync @Inject internal constructor(
         outcome
     }
 
-    // 화면에서 넘긴 기준 시각 이후 전체 동기화가 끝났으면 대기 중인 요청도 건너뛴다.
-    private fun isDue(id: String, retrying: Boolean = false, requestedAt: Long? = null): Boolean {
-        val result = status.value[id]
-        if (requestedAt != null) return (result?.lastFullRun ?: 0L) < requestedAt || (retrying && result?.failed == true)
-        return result.needsAutomaticSync(System.currentTimeMillis(), minutes.value, retrying)
-    }
-
     private suspend fun runScheduledFolder(
-        ticket: FolderComparisonQueue.Root, automatic: Boolean, retrying: Boolean, periodic: Boolean, requestedAt: Long?, mediaToken: String?,
+        ticket: FolderComparisonQueue.Root, periodic: Boolean, mediaToken: String?,
         subfolder: String?, beforeTransfer: suspend () -> Unit,
     ): FolderRunResult? = supervisorScope {
         val id = ticket.id
         val task = operations.withLock {
-            // 같은 폴더의 대기 작업은 앞선 실행 결과를 확인한 뒤에만 시작한다.
-            if (automatic && !isDue(id, retrying, requestedAt)) return@supervisorScope null
+            if (periodic && !scheduled.value) return@supervisorScope null
             val linked = configured().firstOrNull { it.sync.id == id && it.isVisibleSyncTarget() } ?: return@supervisorScope null
             val child = subfolder?.let { path ->
                 if (path.split('/').any { !validSyncName(it) || !isVisibleSyncName(it) } ||
@@ -1100,7 +1104,7 @@ class FolderSync @Inject internal constructor(
                 }
                 beforeTransfer()
                 active.update { it + (id to FolderSyncProgress(id, conflictPolicy = policy, selectedSubfolders = subfolder?.let(::setOf))) }
-                val result = runFolder(linked, policy, automatic || periodic || mediaToken != null, files, changes, startedAt, child, ticket)
+                val result = runFolder(linked, policy, periodic || mediaToken != null, files, changes, startedAt, child, ticket)
                 if (mediaToken != null && result.outcome != SyncOutcome.Retry) mediaChangesLock.withLock { retryMedia.remove(mediaToken) }
                 result
             }

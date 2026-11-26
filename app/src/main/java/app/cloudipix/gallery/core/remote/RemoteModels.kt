@@ -194,6 +194,7 @@ internal data class RemoteAlbum(
     val listingToken: String? = null,
     // 목록에서 인식하는 파일 형식이 바뀌면 올려서 예전 목록을 다시 읽게 한다.
     val mediaVersion: Int = 0,
+    val revisionsDeferred: Boolean = false,
 ) {
     /** [filter]에 맞는 항목만 남긴다. 남는 항목이 없으면 null이다. */
     fun matching(filter: MediaFilter): RemoteAlbum? {
@@ -251,6 +252,8 @@ internal data class RemotePhoto(
     val mimeType: String? = null,
     val cacheVersion: String? = null,
     val taken: Long? = null,
+    // 뷰어가 서버 변경을 확인했을 때 사용 중이던 기기 사본의 수정 시각이다.
+    val staleLocalCopyModified: Long? = null,
 ) {
     val uri: Uri get() = Uri.Builder()
         .scheme(REMOTE_MEDIA_SCHEME)
@@ -270,6 +273,7 @@ internal data class RemotePhoto(
         durationMs = 0L,
         isFavorite = false,
         remoteUri = uri,
+        staleLocalCopyModified = staleLocalCopyModified,
     )
 }
 

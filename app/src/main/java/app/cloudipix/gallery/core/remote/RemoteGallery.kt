@@ -21,7 +21,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -66,7 +68,7 @@ import javax.inject.Singleton
 class RemoteGallery @Inject internal constructor(
     @ApplicationContext context: Context,
     private val transport: RemoteTransport,
-    store: FolderSyncStore,
+    private val store: FolderSyncStore,
     database: SyncIndexDatabase,
 ) {
     private val directory = File(context.noBackupFilesDir, "remote-gallery")
@@ -74,7 +76,7 @@ class RemoteGallery @Inject internal constructor(
     internal val listings = RemoteDirectoryListings(context.cacheDir, database, transport)
     private val settingsLock = Mutex()
     private val refreshLock = Mutex()
-    private val lastFullRead = mutableMapOf<String, Long>()
+    private val folderReadTimes by lazy { context.getSharedPreferences("remote-folder-reads", Context.MODE_PRIVATE) }
     private val dirtyIndexes = mutableSetOf<String>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val cachedIndexesRead = CompletableDeferred<Unit>()
@@ -570,9 +572,11 @@ class RemoteGallery @Inject internal constructor(
         }
     }
 
-    fun refreshInBackground() {
-        val requestedAt = SystemClock.elapsedRealtime()
-        scope.launch { refresh(freshSince = requestedAt) }
+    internal suspend fun refreshVisibleFolders(buckets: Set<Long>, force: Boolean = false) {
+        if (buckets.isEmpty()) return
+        val visibility = VisibleFolderRead(currentCoroutineContext()[Job], System.currentTimeMillis(), force)
+        // 화면을 떠나면 다음 폴더부터 건너뛴다. 이미 시작한 조회 결과는 폴더를 열 때도 이어 쓴다.
+        scope.async { refreshIndex(buckets = buckets, visibility = visibility) }.await()
     }
 
     internal suspend fun applyFileChanges(changes: List<RemoteFileChange>) = withContext(Dispatchers.IO) {
@@ -598,7 +602,8 @@ class RemoteGallery @Inject internal constructor(
                             val type = entry.copy(name = display).type ?: continue
                             val photo = RemotePhoto(serverId, remoteId(serverId, entry.path), display, entry.path,
                                 entry.modified, entry.size, type, entry.etag ?: "${entry.modified}:${entry.size}",
-                                entry.preview, entry.mimeType, UUID.randomUUID().toString(), edit.taken ?: old?.taken)
+                                entry.preview, entry.mimeType, UUID.randomUUID().toString(), edit.taken ?: old?.taken,
+                                old?.takeIf { it.path == entry.path }?.staleLocalCopyModified)
                             (if (original == null) photos else trash)[entry.path] = photo
                         }
                         albums[id] = album.copy(photos = photos.values.toList(), trash = trash.values.toList(), listingToken = null)
@@ -611,40 +616,52 @@ class RemoteGallery @Inject internal constructor(
         }
     }
 
-    suspend fun refresh(serverId: String? = null, changedPhoto: Long? = null,
-        buckets: Set<Long>? = null, taken: Long? = null, freshSince: Long? = null, roots: Set<String>? = null,
-        directories: Set<String>? = null) = withContext(Dispatchers.IO) {
+    suspend fun refresh(serverId: String? = null, buckets: Set<Long>? = null, roots: Set<String>? = null,
+        directories: Set<String>? = null) = refreshIndex(serverId, buckets, roots, directories)
+
+    private suspend fun refreshIndex(serverId: String? = null, buckets: Set<Long>? = null, roots: Set<String>? = null,
+        directories: Set<String>? = null, visibility: VisibleFolderRead? = null) = withContext(Dispatchers.IO) {
+        if (visibility?.active == false) return@withContext
         if (!loadConnections()) return@withContext
         refreshLock.withLock {
-            val shareSince = if (serverId == null && changedPhoto == null && buckets == null && roots == null && directories == null)
+            if (visibility?.active == false) return@withLock
+            val requestedBuckets = if (visibility != null && buckets != null) {
+                buckets.filterTo(hashSetOf()) { visibility.needsRead(folderReadTimes.getLong(it.toString(), 0L)) }
+                    .takeIf { it.isNotEmpty() } ?: return@withLock
+            } else buckets
+            val shareSince = if (serverId == null && buckets == null && roots == null && directories == null)
                 System.nanoTime() else null
             val servers = registered.value.filter {
                 (serverId == null || it.id == serverId) && it.hasLinkedFolders
             }
             for (server in servers) {
-                if (freshSince != null && (lastFullRead[server.id] ?: Long.MIN_VALUE) >= freshSince) continue
+                if (visibility?.active == false) break
+                val previous = snapshots.value[server.id]
                 val affected = if (directories != null) {
                     val links = server.folderLinks
                     directories.filter(links::includes).map { path ->
                         links.byPath[path] ?: RemoteFolder(path, remotePathLabel(path).trimEnd('/').substringAfterLast('/'))
                     }
-                } else if (buckets == null && roots == null) null else
-                    destinations(server, snapshots.value[server.id]?.albums.orEmpty()).filter { folder ->
-                        buckets?.contains(remoteId(server.id, folder.path)) == true || roots.orEmpty().any { root ->
+                } else if (requestedBuckets == null && roots == null) null else {
+                    val indexed = previous?.albums.orEmpty()
+                    val candidates = if (visibility != null && requestedBuckets != null) indexed.filter { it.id in requestedBuckets } else indexed
+                    destinations(server, candidates).filter { folder ->
+                        requestedBuckets?.contains(remoteId(server.id, folder.path)) == true || roots.orEmpty().any { root ->
                             folder.path == root || (!server.discoverAll && folder.path.isRemoteDescendantOf(root))
                         }
                     }
+                }
                 if (affected != null && affected.isEmpty()) continue
                 refreshing.update { it + server.id }
                 try {
-                    val previous = snapshots.value[server.id]
+                    val checkedFolders = mutableMapOf<Long, Long>()
                     val updated = collectAlbumUpdates(previous?.albums.orEmpty(), { albums ->
                         settingsLock.withLock publish@{
                             if (registered.value.none { it.matchesIndex(server) }) return@publish
                             dirtyIndexes += server.id
                             snapshots.update { it + (server.id to RemoteSnapshot(albums, previous?.unavailable ?: false)) }
                         }
-                    }) { emit -> scan(server, changedPhoto, affected, taken, roots, shareSince, previous, emit) }
+                    }) { emit -> scan(server, affected, roots, shareSince, previous, visibility, checkedFolders, emit) }
                     settingsLock.withLock persist@{
                         if (registered.value.none { it.matchesIndex(server) }) return@persist
                         snapshots.update { if (it[server.id] === updated) it else it + (server.id to updated) }
@@ -652,8 +669,10 @@ class RemoteGallery @Inject internal constructor(
                             writeIndex(server.id, updated.albums)
                         }
                         failures.update { if (updated.unavailable) it + server.id else it - server.id }
-                        if (!updated.unavailable && affected == null) {
-                            lastFullRead[server.id] = SystemClock.elapsedRealtime()
+                        if (checkedFolders.isNotEmpty()) {
+                            val edit = folderReadTimes.edit()
+                            checkedFolders.forEach { (id, time) -> edit.putLong(id.toString(), time) }
+                            edit.apply()
                         }
                     }
                 } catch (error: CancellationException) {
@@ -669,12 +688,82 @@ class RemoteGallery @Inject internal constructor(
         }
     }
 
-    internal fun source(uri: Uri): Pair<RemoteServer, RemotePhoto>? {
+    internal fun source(uri: Uri): Pair<RemoteServer, RemotePhoto>? = indexedSource(uri)?.takeIf { (_, photo) ->
+        (photo.cacheVersion ?: photo.revision) == uri.pathSegments.getOrNull(1)
+    }
+
+    private fun indexedSource(uri: Uri): Pair<RemoteServer, RemotePhoto>? {
         val server = registered.value.firstOrNull { it.id == uri.authority } ?: return null
         val id = uri.pathSegments.firstOrNull()?.toLongOrNull() ?: return null
         val photo = snapshots.value[server.id]?.photos?.get(id) ?: return null
-        if ((photo.cacheVersion ?: photo.revision) != uri.pathSegments.getOrNull(1)) return null
         return server to photo
+    }
+
+    internal suspend fun refreshOpenedPhoto(uri: Uri, localCopyModified: Long?): Unit = withContext(Dispatchers.IO) {
+        if (!loaded && !loadConnections()) return@withContext
+        val (server, photo) = indexedSource(uri) ?: return@withContext
+        val folder = transport.parent(server, photo.path)
+        if (!transport.isFolderUnderRoot(server, folder)) return@withContext
+        val fileName = photo.path.substringAfterLast('/').let { if (server.protocol == RemoteProtocol.WebDav) Uri.decode(it) else it }
+        val entry = try {
+            transport.entryAt(server, folder, fileName)
+        } catch (_: IOException) {
+            null
+        }?.takeIf { it.path == photo.path && !it.directory && !it.unsupported } ?: return@withContext
+        val revision = if (entry.etag == null && entry.modified == 0L && entry.size == photo.size) photo.revision
+            else entry.indexRevision(System.currentTimeMillis())
+        val changed = !photo.matches(entry, revision)
+        val staleCopy = localCopyModified?.takeIf { it != photo.staleLocalCopyModified &&
+            (changed || hasOlderLocalCopy(server, folder, entry)) }
+        if (!changed && staleCopy == null) return@withContext
+
+        refreshLock.withLock {
+            settingsLock.withLock update@{
+                if (registered.value.none { it.matchesIndex(server) }) return@update
+                val snapshot = snapshots.value[server.id] ?: return@update
+                val latest = snapshot.photos[photo.id] ?: return@update
+                if (latest != photo && !latest.matches(entry, revision)) return@update
+                val albumId = remoteId(server.id, folder)
+                val albumPosition = snapshot.albums.indexOfFirst { it.id == albumId }
+                if (albumPosition < 0) return@update
+                val album = snapshot.albums[albumPosition]
+                val updated = latest.copy(modified = entry.modified, size = entry.size, revision = revision,
+                    preview = entry.preview, mimeType = entry.mimeType,
+                    cacheVersion = if (latest.matches(entry, revision)) latest.cacheVersion else UUID.randomUUID().toString(),
+                    taken = latest.taken.takeIf { latest.revision == revision },
+                    staleLocalCopyModified = staleCopy ?: latest.staleLocalCopyModified)
+                if (updated == latest) return@update
+                val albums = snapshot.albums.toMutableList()
+                albums[albumPosition] = if (restoredName(fileName) != null) {
+                    album.copy(trash = album.trash.map { if (it.id == photo.id) updated else it })
+                } else {
+                    album.copy(photos = album.photos.map { if (it.id == photo.id) updated else it })
+                }
+                snapshots.update { it + (server.id to RemoteSnapshot(albums, snapshot.unavailable)) }
+                try {
+                    writeIndex(server.id, albums)
+                } catch (_: IOException) {
+                    // 메모리 색인은 계속 사용하고 다음 폴더 갱신에서 저장을 다시 시도한다.
+                }
+            }
+        }
+    }
+
+    private fun hasOlderLocalCopy(server: RemoteServer, path: String, entry: RemoteEntry): Boolean {
+        val root = server.folders.orEmpty().filter { it.sync != null && (path == it.path || path.isRemoteDescendantOf(it.path)) }
+            .maxByOrNull { it.path.length } ?: return false
+        val sync = root.sync ?: return false
+        val relative = if (path == root.path) entry.name else {
+            val directory = RemoteFolder(path, "").relativePathFrom(root) ?: return false
+            "$directory/${entry.name}"
+        }
+        val saved = try {
+            store.readFiles(sync.id, paths = setOf(relative))[relative]?.remote
+        } catch (_: IOException) {
+            null
+        } ?: return false
+        return saved.size != entry.size || (saved.etag != null && entry.etag != null && saved.etag != entry.etag) ||
+            (saved.modified > 0L && entry.modified > 0L && saved.modified != entry.modified)
     }
 
     internal fun photoPath(uri: Uri): String? = source(uri)?.let { (server, photo) ->
@@ -686,9 +775,9 @@ class RemoteGallery @Inject internal constructor(
         "${server.name} · ${remotePathLabel(photo.path)}"
     }
 
-    private suspend fun scan(server: RemoteServer, changedPhoto: Long?,
-        affected: List<RemoteFolder>?, taken: Long?, roots: Set<String>?, shareSince: Long?,
-        previous: RemoteSnapshot?, emit: suspend (RemoteAlbum) -> Unit): RemoteSnapshot {
+    private suspend fun scan(server: RemoteServer, affected: List<RemoteFolder>?, roots: Set<String>?, shareSince: Long?,
+        previous: RemoteSnapshot?, visibility: VisibleFolderRead?, checkedFolders: MutableMap<Long, Long>,
+        emit: suspend (RemoteAlbum) -> Unit): RemoteSnapshot {
         val root = transport.root(server)
         val links = server.folderLinks
         val initial = if (server.discoverAll) listOf(RemoteFolder(root, server.name)) else links.selected
@@ -702,7 +791,13 @@ class RemoteGallery @Inject internal constructor(
         val visited = mutableSetOf<String>()
         val albums = linkedMapOf<Long, RemoteAlbum>()
         val cachedAlbums = previous?.albums.orEmpty().associateBy(RemoteAlbum::id)
-        if (affected != null) {
+        val cachedChildren by lazy {
+            cachedAlbums.values.mapNotNull { it.folderPath(server)?.takeUnless { path -> path == root } }
+                .groupBy { transport.parent(server, it.trimEnd('/')) }
+        }
+        if (visibility != null) {
+            albums.putAll(cachedAlbums)
+        } else if (affected != null) {
             val replaced = affected.mapTo(mutableSetOf()) { remoteId(server.id, it.path) }
             cachedAlbums.filterTo(albums) { (id, album) ->
                 id !in replaced && album.folderPath(server)?.let { path ->
@@ -715,68 +810,90 @@ class RemoteGallery @Inject internal constructor(
         val scanVersion = System.currentTimeMillis()
         while (pending.isNotEmpty()) {
             currentCoroutineContext().ensureActive()
+            if (visibility?.active == false) break
             val (path, name) = pending.removeFirst()
             if (!transport.isVisibleFolder(server, path) || !visited.add(path)) continue
             val albumId = remoteId(server.id, path)
             val walkChildren = recurse && links.scansSubfolders(path)
             try {
                 listings.read(server, path, requireComplete = false, scanStarted = shareSince) { listing ->
-                    val entries = listing.entries
+                    val stored = cachedAlbums[albumId]
+                    val missingEntries = if (listing.complete) false else {
+                        val listed = listing.entries.associateBy(RemoteEntry::path)
+                        stored?.isMissingFrom(listed) == true ||
+                            (walkChildren && cachedChildren[path].orEmpty().any { listed[it]?.directory != true })
+                    }
+                    val confirmed = if (missingEntries) try {
+                        transport.listBeforeDeletion(server, path)
+                    } catch (_: IOException) {
+                        null
+                    } else null
+                    val entries = confirmed ?: listing.entries
+                    val complete = listing.complete || confirmed != null
                     if (walkChildren) {
                         entries.filter { it.directory && !it.name.startsWith('.') }.forEach { pending.add(RemoteFolder(it.path, it.name)) }
+                        if (missingEntries && !complete) failedTrees += path
                     }
                     if (!links.includes(path)) return@read
-                    val stored = cachedAlbums[albumId]
+                    if (!missingEntries || complete) checkedFolders[albumId] = System.currentTimeMillis()
+                    else unavailable = true
                     // 예전 형식 기준으로 만든 앨범은 목록이 바뀌지 않았어도 전체 항목을 다시 읽는다. 항목별 정보는 이어 쓴다.
                     val cached = stored?.takeIf { it.mediaVersion == ALBUM_MEDIA_VERSION }
-                    if (changedPhoto == null && cached != null && listing.token != null && cached.listingToken == listing.token && cached.name == name) {
+                    val revisionsDeferred = cached?.revisionsDeferred == true
+                    // 목록 토큰은 유지하고, 보류한 수정은 전체 항목의 메타데이터를 비교할 때 반영한다.
+                    val canReuseToken = visibility != null || !revisionsDeferred
+                    if (canReuseToken && cached != null && listing.token != null && cached.listingToken == listing.token && cached.name == name) {
                         albums[albumId] = cached
                         return@read
                     }
                     val photos = mutableListOf<RemotePhoto>()
                     val trash = mutableListOf<RemotePhoto>()
                     val delta = listing.changes?.takeIf {
-                        changedPhoto == null && listing.changesFrom != null && listing.changesFrom == cached?.listingToken
+                        canReuseToken && listing.changesFrom != null && listing.changesFrom == cached?.listingToken
                     }
-                    if (delta != null && cached != null) {
-                        val changedPaths = delta.removed.mapTo(mutableSetOf()) { transport.child(server, path, it) }
-                        delta.entries.mapTo(changedPaths) { it.path.trimEnd('/') }
-                        cached.photos.filterTo(photos) { it.path !in changedPaths }
-                        cached.trash.filterTo(trash) { it.path !in changedPaths }
-                    }
+                    var deferred = revisionsDeferred && (visibility != null || !complete)
                     val previousByPath = stored?.let { (it.photos + it.trash).associateBy(RemotePhoto::path) }.orEmpty()
                     for (entry in delta?.entries ?: entries) {
                         if (entry.directory || entry.unsupported || entry.name.endsWith(".sgpart") ||
                             (entry.name.startsWith(SYNC_FILE_PREFIX) && entry.name.endsWith(".backup"))
                         ) continue
                         val originalName = restoredName(entry.name)
-                        val type = (originalName?.let { entry.copy(name = it) } ?: entry).type ?: continue
-                        val revision = entry.etag ?: if (entry.modified > 0L) {
-                            "${entry.modified}:${entry.size}"
-                        } else {
-                            "$scanVersion:${entry.size}"
-                        }
+                        val type = (originalName?.let { entry.copy(name = it) } ?: entry).type
+                        val revision = entry.indexRevision(scanVersion)
                         val previous = previousByPath[entry.path]
-                        val id = previous?.id ?: remoteId(server.id, entry.path)
                         val nameOnScreen = originalName ?: entry.name
                         val destination = if (originalName == null) photos else trash
-                        if (id != changedPhoto && previous != null && previous.revision == revision && previous.name == nameOnScreen &&
-                            previous.modified == entry.modified && previous.size == entry.size && previous.type == type &&
-                            previous.preview == entry.preview && previous.mimeType == entry.mimeType) {
-                            destination += previous
-                            continue
+                        if (previous != null) {
+                            val unchanged = previous.matches(entry, revision) && previous.name == nameOnScreen && previous.type == type
+                            if (visibility != null || unchanged) {
+                                deferred = deferred || !unchanged
+                                destination += previous
+                                continue
+                            }
                         }
-                        val cacheVersion = if (id == changedPhoto) UUID.randomUUID().toString()
-                            else previous?.takeIf { it.revision == revision }?.cacheVersion
-                        val captureTime = if (id == changedPhoto) taken ?: previous?.taken
-                            else previous?.takeIf { it.revision == revision }?.taken
+                        if (type == null) continue
+                        val id = previous?.id ?: remoteId(server.id, entry.path)
+                        val versionMatch = previous?.takeIf { it.revision == revision }
+                        val cacheVersion = versionMatch?.cacheVersion
+                        val captureTime = versionMatch?.taken
                         destination += RemotePhoto(server.id, id, nameOnScreen, entry.path,
-                            entry.modified, entry.size, type, revision, entry.preview, entry.mimeType, cacheVersion, captureTime)
+                            entry.modified, entry.size, type, revision, entry.preview, entry.mimeType, cacheVersion, captureTime,
+                            previous?.staleLocalCopyModified)
+                    }
+                    if (stored != null && (delta != null || !complete)) {
+                        val replaced = (photos + trash).mapTo(hashSetOf(), RemotePhoto::path)
+                        delta?.let { changes ->
+                            changes.removed.mapTo(replaced) { transport.child(server, path, it) }
+                            changes.entries.mapTo(replaced) { it.path.trimEnd('/') }
+                        }
+                        stored.photos.filterTo(photos) { it.path !in replaced }
+                        stored.trash.filterTo(trash) { it.path !in replaced }
                     }
                     val album = RemoteAlbum(albumId, if (path == root) server.name else name, photos.distinctBy { it.id },
-                        trash.distinctBy { it.id }, path, listing.token, ALBUM_MEDIA_VERSION)
+                        trash.distinctBy { it.id }, path, listing.token, ALBUM_MEDIA_VERSION, deferred)
                     albums[albumId] = album
-                    if (album != stored && (album.photos.isNotEmpty() || stored?.photos?.isNotEmpty() == true ||
+                    if ((album.photos != stored?.photos || album.trash != stored?.trash || album.name != stored?.name) &&
+                        (album.photos.isNotEmpty() || stored?.photos?.isNotEmpty() == true ||
                             album.trash.isNotEmpty() || stored?.trash?.isNotEmpty() == true)) {
                         emit(album)
                     }
@@ -788,6 +905,7 @@ class RemoteGallery @Inject internal constructor(
                 if (walkChildren) failedTrees += path
             }
         }
+        if (visibility != null && visited.isEmpty() && previous != null) return previous
         if (failedTrees.isNotEmpty()) {
             for ((id, album) in cachedAlbums) {
                 val path = album.folderPath(server) ?: continue
@@ -889,6 +1007,25 @@ private class RemoteSnapshot(val albums: List<RemoteAlbum>, val unavailable: Boo
     }
 }
 
+private class VisibleFolderRead(private val caller: Job?, private val requestedAt: Long, private val force: Boolean) {
+    val active: Boolean get() = caller?.isActive != false
+
+    fun needsRead(lastRead: Long): Boolean {
+        val age = System.currentTimeMillis() - lastRead
+        return age < 0 || if (force) lastRead < requestedAt else age >= VISIBLE_FOLDER_REFRESH_MS
+    }
+}
+
+private fun RemoteAlbum.isMissingFrom(entries: Map<String, RemoteEntry>): Boolean {
+    fun missing(photo: RemotePhoto) = entries[photo.path]?.let { it.directory || it.unsupported } != false
+    return photos.any(::missing) || trash.any(::missing)
+}
+
+private fun RemoteEntry.indexRevision(fallback: Long): String = etag ?: "${modified.takeIf { it > 0 } ?: fallback}:$size"
+
+private fun RemotePhoto.matches(entry: RemoteEntry, revision: String): Boolean = this.revision == revision &&
+    modified == entry.modified && size == entry.size && preview == entry.preview && mimeType == entry.mimeType
+
 internal fun AtomicFile.writeBytes(bytes: ByteArray) {
     val stream = startWrite()
     try {
@@ -905,3 +1042,4 @@ private const val KEY_ALIAS = "remote_gallery_connections"
 private const val TRANSFORMATION = "AES/GCM/NoPadding"
 private const val IV_SIZE = 12
 private const val ALBUM_UPDATE_INTERVAL_MS = 150L
+private const val VISIBLE_FOLDER_REFRESH_MS = 5 * 60_000L

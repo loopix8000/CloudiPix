@@ -40,26 +40,19 @@ import javax.inject.Singleton
 internal class FolderSyncScheduler(private val context: Context) {
     private val requests = Mutex()
 
-    suspend fun enqueue(id: String?, automatic: Boolean = false, requestedAt: Long? = null, subfolder: String? = null) = requests.withLock {
+    suspend fun enqueue(id: String?, subfolder: String? = null) = requests.withLock {
         val work = WorkManager.getInstance(context)
         val rootWork = workName(id)
         val name = if (subfolder == null) rootWork else "$rootWork/$subfolder"
-        val existing = if (automatic && requestedAt == null) emptyList() else work.getWorkInfosForUniqueWorkFlow(name).first()
-        // 자동으로 요청할 때는 실행 중이거나 재시도를 기다리는 작업을 그대로 이어간다.
+        val existing = work.getWorkInfosForUniqueWorkFlow(name).first()
         val inBackoff = existing.any {
             it.state == WorkInfo.State.ENQUEUED && it.runAttemptCount > 0 && it.nextScheduleTimeMillis > System.currentTimeMillis()
         }
         val request = OneTimeWorkRequestBuilder<FolderSyncWorker>()
             .apply { if (subfolder != null) addTag("$rootWork/subfolders") }
-            .setInputData(workDataOf(KEY_FOLDER to id, KEY_AUTOMATIC to automatic, KEY_REQUESTED_AT to (requestedAt ?: 0L), KEY_SUBFOLDER to subfolder))
+            .setInputData(workDataOf(KEY_FOLDER to id, KEY_SUBFOLDER to subfolder))
             .build()
-        val policy = when {
-            // 앱이나 폴더를 열어 요청하면 실행 중인 작업만 유지하고, 기다리는 작업은 이 요청으로 바꾼다.
-            requestedAt != null ->
-                if (existing.any { it.state == WorkInfo.State.RUNNING }) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE
-            inBackoff -> ExistingWorkPolicy.REPLACE
-            else -> ExistingWorkPolicy.KEEP
-        }
+        val policy = if (inBackoff) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
         work.enqueueUniqueWork(name, policy, request).await()
     }
 
@@ -86,11 +79,11 @@ internal class FolderSyncScheduler(private val context: Context) {
         ).await()
     }
 
-    fun schedule(interval: Int, enabled: Boolean) {
+    fun schedule(interval: Int, hasLinkedFolders: Boolean, enabled: Boolean) {
         val work = WorkManager.getInstance(context)
-        if (!enabled) {
+        if (!enabled || !hasLinkedFolders) {
             work.cancelUniqueWork(WORK_PERIODIC)
-            work.cancelUniqueWork(WORK_NOW)
+            if (!hasLinkedFolders) work.cancelUniqueWork(WORK_NOW)
             return
         }
         val period = interval.toLong()
@@ -107,12 +100,13 @@ internal class FolderSyncScheduler(private val context: Context) {
 
 class FolderSyncWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result {
+        // 이전 버전에서 앱 진입 시 예약한 전체 동기화는 이어서 실행하지 않는다.
+        if (inputData.getLong(KEY_REQUESTED_AT, 0L) > 0) return Result.success()
         // 인터넷 연결이 확인되지 않은 내부망에서도 서버에 접속할 수 있다.
         if (applicationContext.getSystemService(ConnectivityManager::class.java)?.activeNetwork == null) return Result.retry()
         val transfers = EntryPointAccessors.fromApplication(applicationContext, FolderSyncEntryPoint::class.java).transfers()
         val outcome = transfers.run(id, inputData.getString(KEY_FOLDER), WORK_PERIODIC in tags,
-            inputData.getBoolean(KEY_AUTOMATIC, false), runAttemptCount,
-            inputData.getLong(KEY_REQUESTED_AT, 0L).takeIf { it > 0 }, inputData.getString(KEY_MEDIA_TOKEN), inputData.getString(KEY_SUBFOLDER)) {
+            runAttemptCount, inputData.getString(KEY_MEDIA_TOKEN), inputData.getString(KEY_SUBFOLDER)) {
             // 실행 시간 초과나 발열 제한처럼 시스템이 작업을 멈춘 경우에만 전송을 이어간다.
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && stopReason !in STOPPED_ON_REQUEST
         }
@@ -130,15 +124,15 @@ internal class SyncTransfers @Inject constructor(private val sync: FolderSync, p
     private val active = mutableMapOf<UUID, Deferred<SyncOutcome>>()
     private val completed = LruCache<UUID, SyncOutcome>(32)
 
-    suspend fun run(workId: UUID, folder: String?, periodic: Boolean, automatic: Boolean, attempt: Int,
-        requestedAt: Long?, mediaToken: String?, subfolder: String?, stoppedBySystem: () -> Boolean): SyncOutcome = withContext(Dispatchers.Main.immediate) {
+    suspend fun run(workId: UUID, folder: String?, periodic: Boolean, attempt: Int,
+        mediaToken: String?, subfolder: String?, stoppedBySystem: () -> Boolean): SyncOutcome = withContext(Dispatchers.Main.immediate) {
         val previous = completed.remove(workId)
         if (previous != null && (!periodic || attempt > 0)) return@withContext previous
         // 작업자의 실행 시간이 끝나도 화면이나 서비스가 유지하는 전송은 같은 작업 ID로 이어받는다.
         val task = active[workId] ?: scope.async(start = CoroutineStart.LAZY) {
             try {
                 val result = try {
-                    sync.run(folder, periodic, automatic, retrying = attempt > 0, requestedAt = requestedAt, mediaToken = mediaToken, subfolder = subfolder) {
+                    sync.run(folder, periodic, mediaToken, subfolder) {
                         withContext(Dispatchers.Main.immediate) { background.begin(workId) }
                     }
                 } catch (_: IOException) {
@@ -173,7 +167,6 @@ internal interface FolderSyncEntryPoint {
 private const val KEY_FOLDER = "folder"
 private const val KEY_SUBFOLDER = "subfolder"
 private const val KEY_MEDIA_TOKEN = "media-token"
-private const val KEY_AUTOMATIC = "automatic"
 private const val KEY_REQUESTED_AT = "requested-at"
 private const val WORK_PERIODIC = "cloud-folder-sync-periodic"
 private const val WORK_NOW = "cloud-folder-sync-now"

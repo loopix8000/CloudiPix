@@ -17,6 +17,7 @@ import app.cloudipix.gallery.core.model.SortKey
 import app.cloudipix.gallery.core.model.Sorting
 import app.cloudipix.gallery.core.model.grouped
 import app.cloudipix.gallery.core.model.isVirtualFolder
+import app.cloudipix.gallery.core.remote.isRemoteId
 import app.cloudipix.gallery.core.model.shellQuoted
 import app.cloudipix.gallery.core.model.sortedBy
 import app.cloudipix.gallery.core.settings.GallerySettings
@@ -122,6 +123,7 @@ class MediaViewModel @Inject constructor(
     private val route = savedStateHandle.toRoute<Media>()
     internal val bucketId = route.bucketId
     private val virtual = isVirtualFolder(bucketId)
+    private var checkedOnOpen = false
     val isFavorites = bucketId == FAVORITES_BUCKET_ID
 
     /** 이 폴더가 폴더 동기화 대상이면 메뉴에 동기화 항목을 보입니다. */
@@ -185,6 +187,12 @@ class MediaViewModel @Inject constructor(
         grouping = config.groupingFor(bucketId),
         scrollDirection = config.scrollDirection,
     )
+
+    internal suspend fun refreshVisibleFolder() {
+        if (!isRemoteId(bucketId)) return
+        repository.refreshVisibleFolders(setOf(bucketId), force = !checkedOnOpen)
+        checkedOnOpen = true
+    }
 
     /** 이 폴더를 다시 읽습니다. 가상 폴더(최근 항목·즐겨찾기)는 전체를 다시 읽습니다. */
     fun refresh() {

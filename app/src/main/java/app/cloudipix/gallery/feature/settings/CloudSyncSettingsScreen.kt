@@ -46,8 +46,10 @@ import javax.inject.Inject
 @HiltViewModel
 class CloudSyncSettingsViewModel @Inject constructor(sync: FolderSync) : SyncSettingsViewModel(sync) {
     internal val interval = sync.interval
+    internal val scheduledSyncEnabled = sync.scheduledSyncEnabled
     internal val conflictPolicy = sync.conflictPolicy
     internal fun setInterval(minutes: Int) = change { sync.setInterval(minutes) }
+    internal fun setScheduledSyncEnabled(enabled: Boolean) = change { sync.setScheduledSyncEnabled(enabled) }
     internal fun setConflictPolicy(policy: SyncConflictPolicy) = change { sync.setConflictPolicy(policy) }
 }
 
@@ -56,6 +58,7 @@ fun CloudSyncSettingsScreen(onBack: () -> Unit, viewModel: CloudSyncSettingsView
     val context = LocalContext.current
     val root by viewModel.defaultRoot.collectAsStateWithLifecycle()
     val interval by viewModel.interval.collectAsStateWithLifecycle()
+    val scheduledSyncEnabled by viewModel.scheduledSyncEnabled.collectAsStateWithLifecycle()
     val conflictPolicy by viewModel.conflictPolicy.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
@@ -77,8 +80,11 @@ fun CloudSyncSettingsScreen(onBack: () -> Unit, viewModel: CloudSyncSettingsView
                 }
             }
             HorizontalDivider(color = colors.hairline)
+            ToggleRow(stringResource(R.string.sync_scheduled), checked = scheduledSyncEnabled,
+                onChange = viewModel::setScheduledSyncEnabled, enabled = !busy, horizontalPadding = 0.dp)
+            HorizontalDivider(color = colors.hairline)
             LinkRow(stringResource(R.string.sync_interval_value, interval), stringResource(R.string.sync_interval_hint),
-                horizontalPadding = 0.dp, enabled = !busy) { editInterval = true }
+                horizontalPadding = 0.dp, enabled = !busy && scheduledSyncEnabled) { editInterval = true }
             HorizontalDivider(color = colors.hairline)
             LinkRow(stringResource(R.string.sync_conflict_policy), stringResource(conflictPolicy.label),
                 horizontalPadding = 0.dp, enabled = !busy) { policyChoice = conflictPolicy }

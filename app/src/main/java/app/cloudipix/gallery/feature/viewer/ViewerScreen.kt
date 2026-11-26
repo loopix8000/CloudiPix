@@ -87,6 +87,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.cloudipix.gallery.ui.component.iconSize
 import coil3.compose.AsyncImage
 import coil3.BitmapImage
@@ -244,11 +245,29 @@ internal fun ViewerScreen(
     fun displaySource(medium: Medium): Uri {
         val copy = medium.localCopyUri ?: return medium.uri
         val cloud = medium.remoteUri ?: return copy
-        return if (unreadableCopies[copy] == cloud) cloud else copy
+        return if (unreadableCopies[copy] == cloud) cloud else medium.displayUri
     }
     val currentUri = current?.let(::displaySource)
     // 원격 동영상은 원본을 미리 받지 않고 재생기에서 필요한 구간만 읽는다.
     val showingVideo = (current ?: initialMedium)?.type == MediaType.Video
+    val photoToCheck = if (showingVideo) null else
+        (chromeMedium?.remoteUri ?: initialPreview?.uri.takeIf { !state.libraryLoaded })?.takeIf { it.scheme == REMOTE_MEDIA_SCHEME }
+    val photoKey = photoToCheck?.let { it.authority to it.pathSegments.firstOrNull() }
+    var photoChecked by remember(photoKey) { mutableStateOf(false) }
+    var retainedPhotoPreview by remember(photoKey) {
+        mutableStateOf(openingBitmap.takeIf { photoKey?.second == initialPreview?.id?.toString() })
+    }
+    if (photoToCheck != null) {
+        val latestCopyModified by rememberUpdatedState(chromeMedium?.localCopyModified)
+        val latestPhoto by rememberUpdatedState(photoToCheck)
+        LifecycleResumeEffect(photoKey) {
+            val check = scope.launch {
+                viewModel.refreshOpenedPhoto(latestPhoto, latestCopyModified)
+                photoChecked = true
+            }
+            onPauseOrDispose { check.cancel() }
+        }
+    }
     val remoteUri = (currentUri ?: initialMedium?.displayUri ?: initialPreview?.uri)
         ?.takeIf { it.scheme == REMOTE_MEDIA_SCHEME && !showingVideo }
     var attempt by remember(remoteUri) { mutableStateOf(0) }
@@ -277,7 +296,7 @@ internal fun ViewerScreen(
             BarAction.CopyPath -> Unit
         }
     }
-    val downloadSelection by rememberUpdatedState(current?.takeIf { remoteUri != null && it.remoteUri == remoteUri })
+    val downloadSelection by rememberUpdatedState(current?.takeIf { photoChecked && remoteUri != null && it.remoteUri == remoteUri })
     LaunchedEffect(remoteUri, attempt) {
         if (remoteUri == null) return@LaunchedEffect
         try {
@@ -291,6 +310,7 @@ internal fun ViewerScreen(
                     val result = SingletonImageLoader.get(context).execute(request)
                     originalPreview = (result as? SuccessResult)?.image as? BitmapImage
                 }
+                if (originalPreview != null) retainedPhotoPreview = originalPreview
                 remoteOriginal = file
                 try { awaitCancellation() } finally { remoteOriginal = null }
             }
@@ -461,7 +481,10 @@ internal fun ViewerScreen(
                     val uri = displaySource(medium)
                     val zoom = if (active) rememberDeepZoomState() else null
                     val isInitialPhoto = medium.id == initialPreview?.id
-                    val onOriginalDecoded: (BitmapImage) -> Unit = remember(uri) { { decodedPhotos[uri] = it } }
+                    val onOriginalDecoded: (BitmapImage) -> Unit = remember(uri, active, photoKey) { { bitmap ->
+                        decodedPhotos[uri] = bitmap
+                        if (active && medium.id.toString() == photoKey?.second) retainedPhotoPreview = bitmap
+                    } }
                     DisposableEffect(uri) {
                         onDispose { decodedPhotos.remove(uri) }
                     }
@@ -479,7 +502,7 @@ internal fun ViewerScreen(
                         RemoteViewerPhoto(
                             uri = uri,
                             original = if (active) remoteOriginal else null,
-                            preparedPreview = if (active) originalPreview else null,
+                            preparedPreview = if (active) originalPreview ?: retainedPhotoPreview else null,
                             showPreview = !isInitialPhoto || !waitingForInitialPhoto,
                             opened = active,
                             downloadFailed = originalFailed,

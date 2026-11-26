@@ -177,6 +177,8 @@ class FoldersViewModel @Inject constructor(
     }
 
     /** 모든 폴더를 다시 읽습니다. 이미 읽는 중이면 무시합니다. */
+    internal suspend fun refreshVisibleFolders(bucketIds: Set<Long>) = repository.refreshVisibleFolders(bucketIds)
+
     fun refresh() {
         if (refreshing.value) return
         refreshing.value = true

@@ -98,6 +98,9 @@ class ViewerViewModel @Inject constructor(
         )
     }
 
+    internal suspend fun refreshOpenedPhoto(uri: Uri, localCopyModified: Long?) =
+        repository.refreshOpenedPhoto(uri, localCopyModified)
+
     /** 외부 편집 앱에 넘길 원격 사진의 공유 주소입니다. */
     internal suspend fun shareEditorPhoto(photo: Medium): Uri = remoteFiles.shareUri(photo)
 

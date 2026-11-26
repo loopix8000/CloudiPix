@@ -607,6 +607,7 @@
     <string name="sync_use_child_folder">サブフォルダを作成</string>
     <string name="sync_excluded_previous_folder">以前のフォルダを同期対象から除外しました · %1$s</string>
     <string name="sync_final_destination">ファイルの保存先</string>
+    <string name="sync_scheduled">スケジュール同期</string>
     <string name="sync_interval_value">同期間隔 · %1$d 分</string>
     <string name="sync_interval_hint">この間隔でリンク済みクラウドフォルダの一覧を更新し、同期がオンのフォルダのファイルを同期します。Android により予定時刻より遅れる場合があります。</string>
     <string name="sync_change_interval">間隔を変更</string>

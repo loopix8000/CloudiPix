@@ -62,11 +62,13 @@ import java.io.IOException
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.compose.LifecycleStartEffect
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.cloudipix.gallery.core.model.Folder
 import app.cloudipix.gallery.core.model.FolderTab
 import app.cloudipix.gallery.core.model.MediaType
 import app.cloudipix.gallery.core.model.containsFolder
+import app.cloudipix.gallery.core.remote.isRemoteId
 import app.cloudipix.gallery.core.settings.GallerySettings
 import app.cloudipix.gallery.ui.component.CloudFolderIcon
 import app.cloudipix.gallery.core.sync.AlbumSyncState
@@ -164,6 +166,17 @@ fun FoldersScreen(
                         (previewTab == tab.id && it.bucketId == held?.id))
                 }
             }
+        }
+    }
+    if (held == null && !pager.isScrollInProgress) {
+        val settledPage = pager.settledPage.coerceIn(tabs.indices)
+        val visibleFolders = pageFolders[settledPage]
+        val remoteBuckets = remember(visibleFolders) {
+            visibleFolders.mapNotNullTo(mutableSetOf()) { it.bucketId.takeIf(::isRemoteId) }
+        }
+        LifecycleResumeEffect(tabs[settledPage].id, remoteBuckets) {
+            val refresh = scope.launch { viewModel.refreshVisibleFolders(remoteBuckets) }
+            onPauseOrDispose { refresh.cancel() }
         }
     }
     var manageTabs by rememberSaveable { mutableStateOf(false) }

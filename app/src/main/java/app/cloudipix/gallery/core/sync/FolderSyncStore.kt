@@ -89,12 +89,6 @@ private data class StoredSyncRuns(
 
 private const val SYNC_HISTORY_LIMIT = 200
 
-internal fun FolderSyncStatus?.needsAutomaticSync(now: Long, intervalMinutes: Int, retrying: Boolean = false): Boolean {
-    if (retrying && this?.failed == true) return true
-    val lastRun = this?.lastFullRun ?: return true
-    return now < lastRun || now - lastRun >= intervalMinutes * 60_000L
-}
-
 @Serializable
 internal enum class SyncConflictPolicy { KeepBoth, PreferLocal, PreferRemote, PreferNewest, KeepBothVersions }
 
@@ -106,6 +100,7 @@ internal data class StoredSyncPreferences(
     val defaultRoot: SyncRoot? = null,
     val conflictPolicy: SyncConflictPolicy = SyncConflictPolicy.KeepBoth,
     val fileFilters: SyncFileFilterSettings = SyncFileFilterSettings(),
+    val scheduledSyncEnabled: Boolean = true,
 )
 
 @Serializable

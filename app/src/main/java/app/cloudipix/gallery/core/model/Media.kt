@@ -25,6 +25,8 @@ data class Medium(
     /** 원격 항목을 기기에 받아 둔 사본입니다. 있으면 화면에는 사본을 보여 줍니다. */
     val localCopyUri: Uri? = null,
     override val favoriteOrder: Long? = null,
+    val localCopyModified: Long? = null,
+    val staleLocalCopyModified: Long? = null,
 ) : Sortable {
     override val typeRank: Int get() = type.ordinal
     val isRemote: Boolean get() = remoteUri != null
@@ -33,7 +35,7 @@ data class Medium(
     val uri: Uri get() = remoteUri ?: mediaUri(id, type)
 
     /** 화면에 그릴 때 쓰는 주소입니다. */
-    val displayUri: Uri get() = localCopyUri ?: uri
+    val displayUri: Uri get() = localCopyUri?.takeUnless { staleLocalCopyModified != null && staleLocalCopyModified == localCopyModified } ?: uri
 }
 
 /** 폴더 목록의 폴더 하나입니다. 최근 항목·즐겨찾기 같은 가상 폴더도 같은 형태로 나타냅니다. */

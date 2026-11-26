@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +52,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalConfiguration
 import app.cloudipix.gallery.core.model.GridItem
@@ -89,6 +91,7 @@ import app.cloudipix.gallery.ui.formatSize
 import app.cloudipix.gallery.ui.theme.FavoriteRed
 import app.cloudipix.gallery.ui.theme.GalleryTheme
 import app.cloudipix.gallery.ui.theme.Spacing
+import kotlinx.coroutines.launch
 
 @Composable
 fun MediaScreen(
@@ -111,6 +114,11 @@ fun MediaScreen(
     // 첫 목록이 오기 전에는 화면을 열 때 넘겨받은 설정으로 그려 열 수와 간격이 튀지 않게 합니다.
     val settings = if (state.loaded) state.settings else initialSettings
     val bucketId = viewModel.bucketId
+    val scope = rememberCoroutineScope()
+    LifecycleResumeEffect(bucketId) {
+        val refresh = scope.launch { viewModel.refreshVisibleFolder() }
+        onPauseOrDispose { refresh.cancel() }
+    }
     val folderPrefs = settings.folderMediaSettings[bucketId]
     val sorting = settings.sortingFor(bucketId)
     val grouping = settings.groupingFor(bucketId)

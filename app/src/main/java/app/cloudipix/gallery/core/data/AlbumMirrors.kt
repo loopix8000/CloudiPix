@@ -43,7 +43,8 @@ internal class AlbumMirrors(
         filesByName[cloudId]?.get(name)?.takeIf { it.size == size && it.type == type.ordinal }
 
     fun coverUri(cloudId: Long, photo: RemotePhoto): Uri =
-        matchingFile(cloudId, photo.name, photo.size, photo.type)?.let { mediaUri(it.id, photo.type) } ?: photo.uri
+        matchingFile(cloudId, photo.name, photo.size, photo.type)?.takeUnless { it.dateModified == photo.staleLocalCopyModified }
+            ?.let { mediaUri(it.id, photo.type) } ?: photo.uri
 
     fun mergeMedia(local: List<Medium>, cloud: List<Medium>, excluded: Set<Long> = emptySet()): List<Medium> {
         val visibleCloud = cloud.filterNot { it.bucketId in excluded }
@@ -59,9 +60,14 @@ internal class AlbumMirrors(
             null
         }
         return device + visibleCloud.map { item ->
-            val copyUri = copies[item.id]?.uri ?: matchingFile(item.bucketId, item.name, item.size, item.type)
-                ?.takeUnless { it.bucketId in excluded }?.let { mediaUri(it.id, item.type) }
-            if (copyUri != null) item.copy(localCopyUri = copyUri) else item
+            val copy = copies[item.id]
+            val indexed = if (copy == null) matchingFile(item.bucketId, item.name, item.size, item.type)
+                ?.takeUnless { it.bucketId in excluded } else null
+            when {
+                copy != null -> item.copy(localCopyUri = copy.uri, localCopyModified = copy.dateModified)
+                indexed != null -> item.copy(localCopyUri = mediaUri(indexed.id, item.type), localCopyModified = indexed.dateModified)
+                else -> item
+            }
         }
     }
 
