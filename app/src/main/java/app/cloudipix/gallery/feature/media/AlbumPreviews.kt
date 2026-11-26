@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import app.cloudipix.gallery.core.media.Thumbnail
 import app.cloudipix.gallery.core.media.indexedMedia
+import app.cloudipix.gallery.core.media.thumbnailDecodeWorkers
 import app.cloudipix.gallery.core.model.GridItem
 import app.cloudipix.gallery.core.model.MediaType
 import app.cloudipix.gallery.core.model.Medium
@@ -167,7 +168,8 @@ internal fun rememberAlbumThumbnails(
                     }
                 }
             }
-            if (album.full.values.count { !it } < 2) {
+            // 남은 요청이 디코드 스레드 수보다 적어지면 다음 줄을 더해 줄이 끝날 무렵에도 스레드가 놀지 않게 한다.
+            if (album.full.values.count { !it } < thumbnailDecodeWorkers) {
                 visibleRows.firstOrNull { row -> row.any { it !in album.full } }?.forEach { uri ->
                     if (uri !in album.full) album.full[uri] = false
                 }

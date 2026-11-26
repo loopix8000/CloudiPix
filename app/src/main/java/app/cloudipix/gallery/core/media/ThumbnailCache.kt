@@ -215,7 +215,33 @@ private fun thumbnailWorkers(count: Int, name: String) = Executors.newFixedThrea
     }, name)
 }.asCoroutineDispatcher()
 
-internal val thumbnailDispatcher = thumbnailWorkers(2, "Gallery thumbnail decode")
+/**
+ * 원본에서 썸네일을 만드는 스레드 수. 큰 코어 수에 맞춰 2~4개로 정한다.
+ * 작은 코어에서는 디코딩이 몇 배 느리고 화면 스레드와 큰 코어를 다투게 되므로, 큰 코어가 적은 기기는 늘리지 않는다.
+ * CPU 용량을 읽지 못하면 이전처럼 2개를 쓴다.
+ */
+internal val thumbnailDecodeWorkers: Int = performanceCoreCount()?.coerceIn(2, 4) ?: 2
+
+/**
+ * 가장 빠른 코어 용량의 절반 이상인 코어 수. 커널이 코어별 용량(`cpu_capacity`)을 알려 주지 않으면 null.
+ * 파일 초기화 중에 불리므로 아래에 선언한 최상위 값을 쓰지 않는다.
+ */
+private fun performanceCoreCount(): Int? {
+    val capacities = try {
+        File("/sys/devices/system/cpu").listFiles()
+            ?.filter { file -> file.name.startsWith("cpu") && file.name.length > 3 && file.name.drop(3).all(Char::isDigit) }
+            ?.mapNotNull { File(it, "cpu_capacity").takeIf(File::canRead)?.readText()?.trim()?.toIntOrNull() }
+            .orEmpty()
+    } catch (_: IOException) {
+        return null
+    } catch (_: SecurityException) {
+        return null
+    }
+    val fastest = capacities.maxOrNull()?.takeIf { it > 0 } ?: return null
+    return capacities.count { it * 2 >= fastest }
+}
+
+internal val thumbnailDispatcher = thumbnailWorkers(thumbnailDecodeWorkers, "Gallery thumbnail decode")
 // 내장 썸네일과 디스크 캐시 읽기는 작고 금방 끝나므로 원본 디코딩 대기열 뒤에 서지 않도록 따로 처리한다.
 internal val embeddedThumbnailDispatcher = thumbnailWorkers(2, "Gallery embedded thumbnail")
 private val thumbnailWriter = thumbnailWorkers(1, "Gallery thumbnail write")
