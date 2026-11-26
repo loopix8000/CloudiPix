@@ -51,8 +51,7 @@ private val CloudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     strokeWidth = 2f
     strokeCap = Paint.Cap.ROUND
     strokeJoin = Paint.Join.ROUND
-    // 흰 배경 썸네일에서도 윤곽이 보이도록 회색빛이 살짝 도는 흰색을 불투명도 80%로 쓴다.
-    color = 0xCCDCDDE1.toInt()
+    color = 0xCCFFFFFF.toInt()
     setShadowLayer(2.5f, 0f, 1.5f, 0x66000000)
 }
 
