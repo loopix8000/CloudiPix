@@ -157,6 +157,8 @@ internal data class ConnectedFolder(
 
 enum class RemoteFailure { Address, Credentials, Connection, Storage }
 
+private fun isHexDigit(char: Char) = char in '0'..'9' || char in 'a'..'f'
+
 @Serializable
 internal data class RemoteEntry(
     val path: String,
@@ -169,7 +171,27 @@ internal data class RemoteEntry(
     val mimeType: String? = null,
     val unsupported: Boolean = false,
     val modifiedTimeIsApproximate: Boolean = false,
+    // Nextcloud·ownCloud가 알려 주는 파일 ID. 이동하거나 이름을 바꿔도 유지된다.
+    val fileId: Long? = null,
+    // 서버가 저장한 내용 해시 목록(`oc:checksum`). 예: `SHA1:… MD5:…`
+    val checksum: String? = null,
 ) {
+    /** 서버가 저장한 SHA-256 해시입니다. 파일 ID를 함께 알려 주는 서버의 값만 믿습니다. */
+    val serverSha256: String? get() = serverChecksum("SHA256", 64)
+
+    /** 서버가 저장한 SHA-1 해시입니다. 데스크톱 클라이언트가 올린 파일에 주로 있습니다. */
+    val serverSha1: String? get() = serverChecksum("SHA1", 40)
+
+    // 파일 내용이 바뀌면 Nextcloud는 체크섬을 지우거나 새 값으로 바꾼다. 형식이 맞는 값만 고른다.
+    private fun serverChecksum(type: String, length: Int): String? {
+        if (directory || fileId == null) return null
+        return checksum?.split(' ', ',')?.firstNotNullOfOrNull { part ->
+            val kind = part.substringBefore(':', "")
+            val value = part.substringAfter(':', "").trim().lowercase(Locale.ROOT)
+            value.takeIf { kind.trim().equals(type, ignoreCase = true) && it.length == length && it.all(::isHexDigit) }
+        }
+    }
+
     val type: MediaType? get() {
         if (directory) return null
         val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)

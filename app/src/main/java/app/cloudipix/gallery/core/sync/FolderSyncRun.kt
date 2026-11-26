@@ -23,6 +23,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.Serializable
 import java.io.IOException
 import java.security.DigestOutputStream
@@ -31,9 +33,14 @@ import java.util.UUID
 
 private const val MAX_CONCURRENT_DOWNLOADS = 8
 private const val CHECKPOINT_INTERVAL_MS = 30_000L
+// 한 실행에서 원본을 읽어 내용을 비교하는 폴더 수. 목록 비교 자리와 따로 센다.
+private const val MAX_CONTENT_COMPARISONS = 2
+// 부분 동기화에서 한 폴더의 바뀐 이름이 이보다 많으면 이름마다 묻지 않고 폴더 목록을 한 번 읽는다.
+private const val MAX_NAMED_REMOTE_LOOKUPS = 8
 
 @Serializable
-internal data class SyncStamp(val size: Long, val modified: Long, val etag: String? = null)
+// [fileId]는 서버 쪽 기록에만 채운다. 서버에서 옮긴 파일을 알아볼 때 쓰며 기기 쪽 기록에서는 항상 null이다.
+internal data class SyncStamp(val size: Long, val modified: Long, val etag: String? = null, val fileId: Long? = null)
 
 @Serializable
 internal data class SyncedFile(val hash: String, val local: SyncStamp, val remote: SyncStamp? = null) {
@@ -186,20 +193,33 @@ internal class FolderSyncRun(
         val key: String, val local: LocalDocument, val remote: RemoteEntry, val previous: SyncedFile?,
     )
     private data class ContentComparison(val localHash: String, val remoteHash: String?)
-    private data class Directory(val relative: String, val localId: String?, val remotePath: String?, val depth: Int)
+    // [remoteEtag]는 상위 폴더 목록에서 본 이 폴더의 ETag다. 저장된 목록과 같으면 서버에 다시 묻지 않는다.
+    private data class Directory(
+        val relative: String, val localId: String?, val remotePath: String?, val depth: Int, val remoteEtag: String? = null,
+    )
+    // 이동 감지 후보. 한쪽에만 새로 생긴 파일과, 기록은 있는데 한쪽에서만 사라진 파일이다.
+    private class LocalOnly(val path: String, val document: LocalDocument)
+    private class RemoteOnly(val path: String, val entry: RemoteEntry)
+    private class LocalGone(val path: String, val record: SyncedFile, val remote: RemoteEntry)
+    private class RemoteGone(val path: String, val record: SyncedFile, val document: LocalDocument)
+    private class ServerMove(val source: LocalGone, val hash: String)
     private sealed interface DirectoryComparisonEvent {
         data class Discovered(val directories: List<Directory>) : DirectoryComparisonEvent
-        data class Finished(val directory: Directory, val result: Result<Comparison>) : DirectoryComparisonEvent
+        // 목록 비교를 마치고 비교 자리를 내줬다. 내용 비교는 이어서 진행한다.
+        object Listed : DirectoryComparisonEvent
+        data class Finished(val directory: Directory, val result: Result<Comparison>, val listed: Boolean) : DirectoryComparisonEvent
     }
-    private class Comparison(
+    private data class Comparison(
         val locals: Map<String, List<LocalDocument>>, val remotes: Map<String, List<RemoteEntry>>,
         val localBackups: Map<String, LocalDocument>, val remoteBackups: Map<String, RemoteEntry>,
         val localParts: List<LocalDocument>, val remoteParts: List<RemoteEntry>,
         val knownNames: List<String>, val names: Set<String>, val downloads: List<PendingDownload>,
-        val unchanged: Int, val contents: Map<String, Result<ContentComparison>>,
+        val unchanged: Int, val pendingContents: List<PendingComparison>,
+        val contents: Map<String, Result<ContentComparison>> = emptyMap(),
     )
 
     private val prepared = mutableMapOf<String, Result<Comparison>>()
+    private val contentSlots = Semaphore(MAX_CONTENT_COMPARISONS)
     private val updatedStamps = mutableMapOf<String, SyncStamp>()
     private var transferring = false
     var transferWaitMs = 0L
@@ -237,10 +257,23 @@ internal class FolderSyncRun(
     private val observed = mutableSetOf<String>()
     private val preservedPaths = mutableSetOf<String>()
     private val subfolderKeys = subfolders.mapTo(hashSetOf(), ::syncKey)
-    private val unscanned = mutableListOf<String>()
+    // 다시 확인하지 못한 폴더의 접두사. 모두 '/'로 끝난다.
+    private val unscanned = hashSetOf<String>()
+    // 충돌로 건너뛴 항목의 소문자 접두사. 모두 '/'로 끝나며 그 아래 기록을 실행이 끝날 때 남긴다.
+    private val conflicted = hashSetOf<String>()
     private val remotePrefix = "$SYNC_FILE_PREFIX${location.id}-"
     private val localPrefix = ".$remotePrefix"
     private var selectedChildren: Map<String, Set<String>>? = null
+    // 서버가 파일 ID를 알려 주면(Nextcloud·ownCloud) 새 파일을 올릴 때 체크섬을 함께 보낸다.
+    @Volatile private var reportsFileIds = false
+    private val newLocalFiles = mutableListOf<LocalOnly>()
+    private val newRemoteFiles = mutableListOf<RemoteOnly>()
+    private val goneLocally = mutableListOf<LocalGone>()
+    private val goneRemotely = mutableListOf<RemoteGone>()
+    // 키는 옮긴 뒤의 경로다. 원래 경로는 movedAway에 두어 삭제하거나 다시 받지 않게 한다.
+    private val serverMoves = mutableMapOf<String, ServerMove>()
+    private val deviceMoves = mutableMapOf<String, RemoteGone>()
+    private val movedAway = hashSetOf<String>()
     val remoteEdits = mutableListOf<RemoteFileChange>()
     val readStats = RemoteReadStats()
     var localListMs = 0L
@@ -276,6 +309,8 @@ internal class FolderSyncRun(
         try {
             prepareTree(Directory("", location.localId, remotePath, 0))
             applyComparedStamps()
+            checkpointIfDue()
+            planMoves()
             walk("", location.localId, remotePath, { location.localId }, { remotePath }, depth = 0)
         } finally {
             if (transferring) transfers.unlock()
@@ -284,13 +319,16 @@ internal class FolderSyncRun(
         val considered = paths ?: files.keys
         val forgotten = considered.filter {
             (manualSubfolder == null || it.isWithinSubfolder(manualSubfolder)) &&
-                it !in observed && unscanned.none(it::startsWith) && !it.hasHiddenFolderSegment() && !location.excludesSubfolder(it)
+                it !in observed && !it.hasAncestorIn(unscanned) && !isConflicted(it) &&
+                !it.hasHiddenFolderSegment() && !location.excludesSubfolder(it)
         }
         forgotten.forEach(files::remove)
         progress = progress.copy(relativePath = "", entryNumber = 0, directoryEntries = 0)
     }
 
-    private suspend fun readFolderLists(localDirectory: String?, remoteDirectory: String?): Pair<List<LocalDocument>, List<RemoteEntry>> {
+    private suspend fun readFolderLists(
+        localDirectory: String?, remoteDirectory: String?, knownEtag: String? = null, probe: Boolean = false,
+    ): Pair<List<LocalDocument>, List<RemoteEntry>> {
         synchronized(this) {
             if (readers++ == 0) readingSince = SystemClock.elapsedRealtime()
         }
@@ -300,7 +338,8 @@ internal class FolderSyncRun(
                     async {
                         val begin = SystemClock.elapsedRealtime()
                         try {
-                            listings.read(server, parent, requireComplete = true, scanStarted = scanStarted).entries
+                            listings.read(server, parent, requireComplete = true, scanStarted = scanStarted,
+                                knownEtag = knownEtag, probeEtag = probe).entries
                         } finally {
                             synchronized(this@FolderSyncRun) { remoteListMs += SystemClock.elapsedRealtime() - begin }
                         }
@@ -326,49 +365,80 @@ internal class FolderSyncRun(
     private suspend fun prepareTree(root: Directory) = coroutineScope {
         val pending = ArrayDeque<Directory>()
         pending.add(root)
-        val events = Channel<DirectoryComparisonEvent>(FolderComparisonQueue.CAPACITY)
-        var inFlight = 0
-        while (pending.isNotEmpty() || inFlight > 0) {
-            while (pending.isNotEmpty() && inFlight < FolderComparisonQueue.CAPACITY) {
+        val events = Channel<DirectoryComparisonEvent>(Channel.UNLIMITED)
+        // 목록을 읽는 폴더만 비교 자리 수로 제한한다. 내용 비교 중인 폴더가 다음 폴더의 목록 읽기를 막지 않는다.
+        var listing = 0
+        var running = 0
+        while (pending.isNotEmpty() || running > 0) {
+            while (pending.isNotEmpty() && listing < FolderComparisonQueue.CAPACITY) {
                 val directory = pending.removeFirst()
-                inFlight++
+                listing++
+                running++
                 launch {
+                    var listed = false
                     val result = try {
-                        Result.success(comparisons.compare {
+                        val plan = comparisons.compare {
                             compareDirectory(directory) { children ->
                                 if (children.isNotEmpty()) events.send(DirectoryComparisonEvent.Discovered(children))
                             }
-                        })
+                        }
+                        listed = true
+                        events.send(DirectoryComparisonEvent.Listed)
+                        Result.success(withContents(directory, plan))
                     } catch (error: IOException) {
                         Result.failure(error)
                     } catch (error: SecurityException) {
                         Result.failure(error)
                     }
-                    events.send(DirectoryComparisonEvent.Finished(directory, result))
+                    events.send(DirectoryComparisonEvent.Finished(directory, result, listed))
                 }
             }
             when (val event = events.receive()) {
                 is DirectoryComparisonEvent.Discovered -> event.directories.forEach(pending::addLast)
+                DirectoryComparisonEvent.Listed -> listing--
                 is DirectoryComparisonEvent.Finished -> {
-                    inFlight--
+                    running--
+                    if (!event.listed) listing--
                     prepared[event.directory.relative] = event.result
                 }
             }
         }
     }
 
-    private suspend fun compareDirectory(directory: Directory, onChildren: suspend (List<Directory>) -> Unit = {}): Comparison {
+    private suspend fun compareDirectory(directory: Directory, onChildren: suspend (List<Directory>) -> Unit = {}): Comparison =
+        markComparing(directory, countPeak = true) { compareEntries(directory, onChildren) }
+
+    // 원본을 읽는 내용 비교는 목록 비교 자리를 내준 뒤 실행 안의 별도 한도에서 진행한다.
+    private suspend fun withContents(directory: Directory, plan: Comparison): Comparison {
+        if (plan.pendingContents.isEmpty()) return plan
+        return contentSlots.withPermit {
+            markComparing(directory, countPeak = false) { plan.copy(contents = compareContents(plan.pendingContents)) }
+        }
+    }
+
+    private suspend fun <T> markComparing(directory: Directory, countPeak: Boolean, block: suspend () -> T): T {
         val path = directory.relative.trimEnd('/')
         synchronized(this) {
             val comparing = progress.comparingFolders + path
-            peakComparisons = maxOf(peakComparisons, comparing.size)
+            if (countPeak) peakComparisons = maxOf(peakComparisons, comparing.size)
             progress = progress.copy(comparingFolders = comparing)
         }
         try {
-            return compareEntries(directory, onChildren)
+            return block()
         } finally {
             synchronized(this) { progress = progress.copy(comparingFolders = progress.comparingFolders - path) }
         }
+    }
+
+    // 바뀐 이름이 적으면 이름마다 묻고, 많으면 폴더 목록을 한 번 읽어 고른다. 목록은 같은 폴더의 다음 조회와 공유된다.
+    private suspend fun selectedRemoteEntries(relative: String, parent: String, names: Set<String>, etag: String?): List<RemoteEntry> {
+        if (names.size <= MAX_NAMED_REMOTE_LOOKUPS) return names.mapNotNull { name ->
+            transport.entryAt(server, parent, name) ?: if (relative + name in files)
+                transport.entryAt(server, parent, backupName(name, remotePrefix)) else null
+        }
+        val keys = names.mapTo(hashSetOf(), ::syncKey)
+        val backups = names.filter { relative + it in files }.mapTo(hashSetOf()) { backupName(it, remotePrefix) }
+        return readFolderLists(null, parent, etag).second.filter { syncKey(it.name) in keys || it.name in backups }
     }
 
     private suspend fun compareEntries(directory: Directory, onChildren: suspend (List<Directory>) -> Unit): Comparison {
@@ -378,7 +448,8 @@ internal class FolderSyncRun(
         val selectedNames = selectedChildren?.get(parentKey)
         val selection = selectedNames?.mapTo(hashSetOf(), ::syncKey)
         val (localList, remoteList) = if (selectedNames == null) {
-            readFolderLists(localDirectory, remoteDirectory)
+            // 루트는 폴더 ETag만 먼저 확인해, 아무것도 바뀌지 않은 트리는 요청 한 번으로 끝낸다.
+            readFolderLists(localDirectory, remoteDirectory, directory.remoteEtag, probe = depth == 0)
         } else {
             val locals = localDirectory?.let { parent ->
                 selectedNames.mapNotNull { name ->
@@ -387,13 +458,11 @@ internal class FolderSyncRun(
                 }
             }.orEmpty()
             val remotes = remoteDirectory?.let { parent ->
-                selectedNames.mapNotNull { name ->
-                    transport.entryAt(server, parent, name) ?: if (relative + name in files)
-                        transport.entryAt(server, parent, backupName(name, remotePrefix)) else null
-                }
+                selectedRemoteEntries(relative, parent, selectedNames, directory.remoteEtag)
             }.orEmpty()
             locals to remotes
         }
+        if (!reportsFileIds && remoteList.any { it.fileId != null }) reportsFileIds = true
         val nextChild = manualSubfolder?.takeUnless { relative.trimEnd('/').isWithinSubfolder(it) }
             ?.removePrefix(relative)?.substringBefore('/')
         val cleanParts = selection == null && nextChild == null
@@ -458,11 +527,17 @@ internal class FolderSyncRun(
                     selectedChildren?.containsKey(syncKey("$path/")) != false &&
                     (localBackups.isEmpty() || backupName(name, localPrefix) !in localBackups) &&
                     (remoteBackups.isEmpty() || backupName(name, remotePrefix) !in remoteBackups)
-                ) children.add(Directory("$path/", existing?.id, remote?.path, depth + 1))
+                ) children.add(Directory("$path/", existing?.id, remote?.path, depth + 1, remote?.etag))
                 continue
             }
             if (nextChild != null) continue
-            val entry = remote ?: continue
+            if (remote == null) {
+                if (existing != null && locals.size == 1 && remotes.isEmpty()) {
+                    noteLocalOnly(relative + existing.name, existing, fileFilter, localBackups, remoteBackups)
+                }
+                continue
+            }
+            val entry = remote
             val path = relative + entry.name
             if (entry.unsupported || !validSyncName(entry.name) || location.excludesSubfolder(path) ||
                 selectedChildren?.containsKey(syncKey("$path/")) == true ||
@@ -475,7 +550,10 @@ internal class FolderSyncRun(
             if (!fileFilter.allows(entry.name, existing?.mimeType, entry.mimeType)) continue
             val localStamp = existing?.syncStamp()
             val remoteStamp = entry.syncStamp()
-            if (previous?.matchesBoth(localStamp, remoteStamp) == true) {
+            // 서버 체크섬이 기록한 해시와 같으면 ETag가 바뀌었어도 내용은 그대로다.
+            val sameByChecksum = previous != null && localStamp != null && previous.local.modified > 0 &&
+                previous.local == localStamp && entry.serverSha256 == previous.hash
+            if (previous?.matchesBoth(localStamp, remoteStamp) == true || sameByChecksum) {
                 if (syncKey(path) in subfolderKeys) continue
                 if (previous.remote != remoteStamp) stamps[path] = remoteStamp
                 stable.add(path)
@@ -485,25 +563,96 @@ internal class FolderSyncRun(
                 if (stable.size == 256) reportUnchanged()
             } else if (previous.canQueueDownload(localStamp, remoteStamp)) {
                 val job = PendingDownload(key, entry, existing, previous?.hash)
-                if (existing == null) newDownloads.add(job) else updates.add(job)
+                if (existing == null) {
+                    newDownloads.add(job)
+                    synchronized(this) { newRemoteFiles.add(RemoteOnly(path, entry)) }
+                } else updates.add(job)
             } else if (existing != null) {
                 pendingComparisons.add(PendingComparison(key, existing, entry, previous))
+            } else if (previous != null && previous.remoteUnchanged(entry)) {
+                synchronized(this) { goneLocally.add(LocalGone(path, previous, entry)) }
             }
         }
         reportUnchanged()
         // 먼저 하위 폴더를 예약해 현재 폴더의 내용 비교가 끝나기 전에도 시작할 수 있게 한다.
         onChildren(children)
         return Comparison(localEntries, remoteEntries, localBackups, remoteBackups, localParts, remoteParts,
-            knownNames, names, newDownloads + updates, unchanged, compareContents(pendingComparisons))
+            knownNames, names, newDownloads + updates, unchanged, pendingComparisons)
+    }
+
+    // 서버에 없는 기기 파일을 이동 후보로 모은다. 실제 처리는 적용 단계의 같은 조건에서만 일어난다.
+    private fun noteLocalOnly(path: String, document: LocalDocument, filter: SyncFileFilter,
+        localBackups: Map<String, LocalDocument>, remoteBackups: Map<String, RemoteEntry>) {
+        val name = document.name
+        if (document.directory || !validSyncName(name) || location.excludesSubfolder(path) ||
+            selectedChildren?.containsKey(syncKey("$path/")) == true || !filter.allows(name, document.mimeType, null) ||
+            (localBackups.isNotEmpty() && backupName(name, localPrefix) in localBackups) ||
+            (remoteBackups.isNotEmpty() && backupName(name, remotePrefix) in remoteBackups)
+        ) return
+        val previous = files[path]
+        synchronized(this) {
+            if (previous == null) newLocalFiles.add(LocalOnly(path, document))
+            else if (previous.local.modified > 0 && previous.local == document.syncStamp()) goneRemotely.add(RemoteGone(path, previous, document))
+        }
+    }
+
+    // 한쪽에서 사라진 기록과 내용이 같은 새 파일을 짝지어, 지우고 다시 보내는 대신 반대쪽에서도 옮긴다.
+    // 내용이 같으면 실제로 옮긴 것이 아니어도 결과가 같으므로, 각 파일을 한 번씩만 짝짓는다.
+    private suspend fun planMoves() {
+        if (goneRemotely.isNotEmpty() && newRemoteFiles.isNotEmpty()) {
+            val byFileId = goneRemotely.filter { it.record.remote?.fileId != null }.groupBy { it.record.remote?.fileId }
+            val byHash = goneRemotely.groupBy { it.record.hash }
+            val used = hashSetOf<String>()
+            for (target in newRemoteFiles) {
+                val entry = target.entry
+                // 파일 ID가 같아도 옮기면서 내용이 바뀌었을 수 있어 크기와 수정 시각까지 확인한다.
+                val sameFile = entry.fileId?.let { id -> byFileId[id]?.singleOrNull() }?.takeIf { source ->
+                    val saved = source.record.remote
+                    saved != null && saved.size == entry.size && saved.modified > 0 && saved.modified == entry.modified &&
+                        !entry.modifiedTimeIsApproximate && source.path !in used
+                }
+                val source = sameFile ?: entry.serverSha256?.let { hash ->
+                    byHash[hash]?.firstOrNull { it.path !in used && it.record.local.size == entry.size }
+                } ?: continue
+                used.add(source.path)
+                deviceMoves[target.path] = source
+                movedAway.add(source.path)
+            }
+        }
+        if (goneLocally.isNotEmpty() && newLocalFiles.isNotEmpty()) {
+            val bySize = goneLocally.groupBy { it.record.local.size }
+            val used = hashSetOf<String>()
+            for (target in newLocalFiles) {
+                currentCoroutineContext().ensureActive()
+                val candidates = bySize[target.document.size]?.filter { it.path !in used }
+                if (candidates.isNullOrEmpty()) continue
+                // 크기가 같은 후보가 있을 때만 새 파일의 내용을 읽는다.
+                val hash = try {
+                    local.fingerprint(target.document)
+                } catch (_: IOException) {
+                    continue
+                } catch (_: SecurityException) {
+                    continue
+                }
+                val source = candidates.firstOrNull { it.record.hash == hash } ?: continue
+                used.add(source.path)
+                serverMoves[target.path] = ServerMove(source, hash)
+                movedAway.add(source.path)
+            }
+        }
     }
 
     private suspend fun compareContents(pending: List<PendingComparison>): Map<String, Result<ContentComparison>> = buildMap {
         for ((key, left, right, previous) in pending) {
             currentCoroutineContext().ensureActive()
             val result = try {
-                val localHash = local.fingerprint(left)
+                val serverSha256 = right.serverSha256
+                val serverSha1 = if (serverSha256 == null) right.serverSha1 else null
+                val (localHash, localSha1) = if (serverSha1 == null) local.fingerprint(left) to null else local.fingerprintWithSha1(left)
+                // 서버가 저장한 체크섬이 있으면 내려받지 않고 비교한다. SHA-1은 같은지 확인하는 데만 쓴다.
                 // 다운로드에 쓰일 파일은 적용 단계에서 임시 파일로 받아 다시 읽는 일을 피한다.
-                val remoteHash = previous?.hashForRemote(right.syncStamp())
+                val remoteHash = previous?.hashForRemote(right.syncStamp()) ?: serverSha256
+                    ?: localHash.takeIf { localSha1 != null && localSha1 == serverSha1 }
                     ?: if (mayStageRemote(localHash, previous)) null else transport.digest(server, right.path).hex()
                 Result.success(ContentComparison(localHash, remoteHash))
             } catch (error: IOException) {
@@ -520,16 +669,19 @@ internal class FolderSyncRun(
         currentCoroutineContext().ensureActive()
         if (selectedChildren?.containsKey(syncKey(relative)) == false) return
         // 백업 복구 후에야 진입할 수 있는 폴더만 여기서 처음 비교한다.
-        val plan = prepared.remove(relative)?.getOrThrow() ?: comparisons.compare {
-            compareDirectory(Directory(relative, localDirectory, remoteDirectory, depth)).also { applyComparedStamps() }
-        }
+        val plan = prepared.remove(relative)?.getOrThrow()
+            ?: Directory(relative, localDirectory, remoteDirectory, depth).let { directory ->
+                withContents(directory, comparisons.compare { compareDirectory(directory).also { applyComparedStamps() } })
+            }
         val localEntries = plan.locals
         val remoteEntries = plan.remotes
         val localBackups = plan.localBackups
         val remoteBackups = plan.remoteBackups
         val knownNames = plan.knownNames
         val names = plan.names
-        val downloads = plan.downloads
+        // 기기에서 옮겨 처리할 새 서버 파일은 내려받지 않고 아래에서 하나씩 처리한다.
+        val downloads = if (deviceMoves.isEmpty()) plan.downloads
+            else plan.downloads.filterNot { relative + it.remote.name in deviceMoves }
         val unchanged = plan.unchanged
         val directoryEntries = names.size + unchanged
         val fileFilter = filterForFolder(relative)
@@ -631,6 +783,8 @@ internal class FolderSyncRun(
             }
         }
         removeDeleted(relative, writableLocal, writableRemote, deletions)
+        // 전송 없이 내용 비교로 확정한 기록도 폴더를 마칠 때마다 주기적으로 저장한다.
+        checkpointIfDue()
         subfolders.firstOrNull { relative.trimEnd('/').equals(it, ignoreCase = true) }?.let { finished ->
             progress = progress.copy(finishedSubfolders = progress.finishedSubfolders + finished)
         }
@@ -739,10 +893,16 @@ internal class FolderSyncRun(
         unscanned.add("$path/")
     }
 
+    // 충돌한 항목과 그 아래 기록은 지우지 않도록 접두사만 남기고, 실행이 끝날 때 한 번에 확인한다.
     private fun conflict(relative: String, name: String) {
         tally(relative + name) { plusConflict() }
-        val prefix = syncKey(relative + name)
-        observed.addAll(files.keys.filter { syncKey(it).let { path -> path == prefix || path.startsWith("$prefix/") } })
+        conflicted.add(syncKey(relative + name) + "/")
+    }
+
+    private fun isConflicted(path: String): Boolean {
+        if (conflicted.isEmpty()) return false
+        val key = syncKey(path)
+        return "$key/" in conflicted || key.hasAncestorIn(conflicted)
     }
 
     private suspend fun reconcile(
@@ -757,6 +917,8 @@ internal class FolderSyncRun(
         deletions: MutableList<PendingDeletion>,
         compared: ContentComparison?,
     ) {
+        // 반대쪽에서도 옮기기로 한 원래 위치는 지우거나 다시 받지 않는다. 옮기지 못하면 다음 실행에서 처리한다.
+        if (path in movedAway) return
         val previous = files[path]
         if (previous != null && left == null && right != null) {
             // 삭제와 원격 수정이 겹쳤는지는 휴지통 이동 직전에 해당 파일로 판단한다.
@@ -766,13 +928,17 @@ internal class FolderSyncRun(
         // 동기화 이력이 있는 파일의 로컬 부재는 삭제일 수 있으므로 새 파일만 바로 받는다.
         if (previous == null && left == null && right != null) {
             beginTransfer()
+            val move = deviceMoves.remove(path)
+            if (move != null && moveOnDevice(path, name, right, move, ensureLocal)) return
             receive(path, ensureLocal(), right, null, null, null)
             return
         }
         // 서버에 없는 새 로컬 파일은 올리면서 한 번만 해시를 계산한다.
         if (previous == null && right == null && left != null) {
             beginTransfer()
-            upload(path, ensureRemote(), name, left, null, null, null)
+            val move = serverMoves.remove(path)
+            if (move != null && moveOnServer(path, name, left, move, ensureRemote)) return
+            upload(path, ensureRemote(), name, left, move?.hash, null, null)
             return
         }
         val localStamp = left?.syncStamp()
@@ -784,7 +950,7 @@ internal class FolderSyncRun(
             return
         }
         val localHash = compared?.localHash ?: left?.let { local.fingerprint(it) }
-        val knownRemoteHash = compared?.remoteHash ?: previous?.hashForRemote(remoteStamp)
+        val knownRemoteHash = compared?.remoteHash ?: previous?.hashForRemote(remoteStamp) ?: right?.serverSha256
         val draft = if (knownRemoteHash == null && left != null && right != null && mayStageRemote(localHash, previous)) {
             beginTransfer()
             stageDownload(requireNotNull(localParent), right)
@@ -796,6 +962,59 @@ internal class FolderSyncRun(
         } finally {
             draft?.let(::discardDownload)
         }
+    }
+
+    // 서버에서 옮긴 파일을 기기에서도 옮긴다. 원래 파일이 그대로일 때만 옮기고, 실패하면 평소처럼 내려받는다.
+    private suspend fun moveOnDevice(path: String, name: String, entry: RemoteEntry, move: RemoteGone, ensureLocal: () -> String): Boolean {
+        try {
+            val parent = ensureLocal()
+            if (local.document(move.document.id) == move.document) {
+                val moved = local.document(local.move(move.document, parent, name))
+                files.remove(move.path)
+                files[path] = SyncedFile(move.record.hash, moved.syncStamp(), entry.syncStamp())
+                observed.add(move.path)
+                countDownload(path)
+                checkpointIfDue()
+                return true
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: IOException) {
+        } catch (_: SecurityException) {
+        }
+        // 아직 처리하지 않은 원래 위치는 평소대로 처리한다.
+        movedAway.remove(move.path)
+        return false
+    }
+
+    // 기기에서 옮긴 파일을 서버에서도 옮긴다. 서버 파일이 기록과 같을 때만 옮기고, 실패하면 평소처럼 올린다.
+    private suspend fun moveOnServer(path: String, name: String, file: LocalDocument, move: ServerMove,
+        ensureRemote: suspend () -> String): Boolean {
+        val source = move.source
+        try {
+            val parent = ensureRemote()
+            // 강한 ETag가 있으면 그 사이 바뀐 서버 파일은 옮기지 않는다.
+            val moved = transport.moveEntry(server, source.remote, parent, name)
+            files.remove(source.path)
+            files[path] = SyncedFile(move.hash, file.syncStamp(), moved.syncStamp())
+            observed.add(source.path)
+            tally(path) { plusUploaded() }
+            changed = true
+            remoteChanged = true
+            if (selectedChildren != null) {
+                remoteEdits += RemoteFileChange(server.id, transport.parent(server, source.remote.path), source.remote.path, null)
+                remoteEdits += RemoteFileChange(server.id, parent, moved.path, moved)
+            }
+            onPublished(path, moved)
+            checkpointIfDue()
+            return true
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: IOException) {
+        } catch (_: SecurityException) {
+        }
+        movedAway.remove(source.path)
+        return false
     }
 
     private fun mayStageRemote(localHash: String?, previous: SyncedFile?): Boolean =
@@ -821,6 +1040,7 @@ internal class FolderSyncRun(
                 if (left != null && right != null) onPublished(path, right)
                 files[path] = SyncedFile(requireNotNull(localHash), requireNotNull(left).syncStamp(), right?.syncStamp())
                 tally(path) { plusUnchanged() }
+                checkpointIfDue()
             }
             SyncFileAction.Upload -> upload(path, ensureRemote(), name, requireNotNull(left), requireNotNull(localHash), right, remoteHash)
             SyncFileAction.Download -> receive(path, ensureLocal(), requireNotNull(right), left, localHash, remoteHash, draft)
@@ -943,8 +1163,10 @@ internal class FolderSyncRun(
         }
     }
 
-    private suspend fun upload(path: String, parent: String, name: String, file: LocalDocument, hash: String?,
+    private suspend fun upload(path: String, parent: String, name: String, file: LocalDocument, knownHash: String?,
         existing: RemoteEntry?, previous: String?) {
+        // 체크섬을 저장하는 서버에는 새 파일의 해시를 먼저 계산해 함께 보낸다. 다른 기기가 내려받지 않고 비교할 수 있다.
+        val hash = knownHash ?: if (reportsFileIds && existing == null) local.fingerprint(file) else null
         val caller = currentCoroutineContext()
         val mime = photoMime(name)
         val uploaded = transport.uploadForSync(server, parent, name, file.size, existing, mime,
@@ -1000,8 +1222,11 @@ internal class FolderSyncRun(
                     // 서버 파일은 휴지통 이름으로 옮기며, 강한 ETag가 있으면 그 사이 바뀐 파일은 옮기지 않는다.
                     val parent = transport.parent(server, remote.path)
                     val saved = files[deletion.path] ?: throw IOException("삭제할 파일의 동기화 기록이 없습니다.")
-                    if (saved.hashForRemote(remote.syncStamp()) == null &&
-                        transport.digest(server, remote.path).hex() != saved.hash) {
+                    // 서버 체크섬이나 목록 정보로 그대로임을 알 수 있으면 내려받아 확인하지 않는다.
+                    val serverHash = remote.serverSha256
+                    val changedOnServer = if (serverHash != null) serverHash != saved.hash
+                        else !saved.remoteUnchanged(remote) && transport.digest(server, remote.path).hex() != saved.hash
+                    if (changedOnServer) {
                         tally(deletion.path) { plusConflict() }
                         continue
                     }
@@ -1118,11 +1343,42 @@ internal fun childrenForChanges(paths: Set<String>): Map<String, Set<String>> {
     return result
 }
 
+// 경로의 상위 폴더 접두사('/'로 끝남) 중 하나가 [prefixes]에 있는지 확인한다. 접두사 목록 전체를 훑지 않는다.
+internal fun String.hasAncestorIn(prefixes: Set<String>): Boolean {
+    if (prefixes.isEmpty()) return false
+    var slash = indexOf('/')
+    while (slash >= 0) {
+        if (substring(0, slash + 1) in prefixes) return true
+        slash = indexOf('/', slash + 1)
+    }
+    return false
+}
+
 internal fun isVisibleSyncName(name: String) = !name.startsWith('.') && !name.endsWith(".sgpart") &&
     !(name.startsWith(SYNC_FILE_PREFIX) && name.endsWith(".backup")) && restoredName(name) == null
 
 private fun LocalDocument.syncStamp() = SyncStamp(size, modified)
-private fun RemoteEntry.syncStamp() = SyncStamp(size, modified, etag)
+private fun RemoteEntry.syncStamp() = SyncStamp(size, modified, etag, fileId)
+
+/**
+ * 기록한 뒤 서버 파일이 바뀌지 않았는지 목록 정보로 확인한다. 강한 ETag나 서버 체크섬이 있으면 그 값으로,
+ * 없으면 크기·정확한 수정 시각·ETag가 모두 같을 때 그대로로 본다. 휴지통 이동처럼 되돌릴 수 있는 작업에만 쓴다.
+ */
+private fun SyncedFile.remoteUnchanged(entry: RemoteEntry): Boolean {
+    if (hashForRemote(entry.syncStamp()) != null) return true
+    entry.serverSha256?.let { return it == hash }
+    val saved = remote ?: return false
+    return !entry.modifiedTimeIsApproximate && saved.size == entry.size && saved.modified > 0 &&
+        saved.modified == entry.modified && saved.etag == entry.etag
+}
+
+// SHA-256과 함께 SHA-1을 한 번에 계산한다. 서버가 SHA-1 체크섬만 가진 파일과 내용이 같은지 볼 때 쓴다.
+private suspend fun LocalSyncStorage.fingerprintWithSha1(file: LocalDocument): Pair<String, String> {
+    val sha1 = MessageDigest.getInstance("SHA-1")
+    val caller = currentCoroutineContext()
+    val sha256 = copyAndHash(file, DigestOutputStream(DiscardOutput, sha1)) { caller.ensureActive() }
+    return sha256 to sha1.digest().hex()
+}
 
 internal fun conflictCopyName(name: String, hash: String, index: Int): String {
     val stem = name.substringBeforeLast('.').take(32).trimEnd { it.isHighSurrogate() }

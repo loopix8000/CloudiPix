@@ -21,6 +21,7 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.Response
 import okio.BufferedSink
 import okio.ByteString.Companion.decodeBase64
+import okio.ByteString.Companion.toByteString
 import okio.buffer
 import okio.sink
 import org.apache.commons.net.ftp.FTP
@@ -48,6 +49,12 @@ import javax.inject.Singleton
 internal class RemoteRequestException(val failure: RemoteFailure) : IOException()
 
 internal data class UploadVersion(val etag: String?, val modified: Long)
+
+/**
+ * 폴더 변경 목록 요청의 결과입니다. [listing]이 null이면 일반 목록으로 다시 읽습니다.
+ * [rejected]는 서버가 변경 목록 요청 자체를 받지 않는다고 응답했다는 뜻입니다.
+ */
+internal class DavChanges(val listing: DavListing?, val rejected: Boolean = false)
 internal data class UploadedFile(val hash: String, val version: UploadVersion?)
 
 private class SyncUploadBody(val size: Long, val mime: String, val write: (OutputStream) -> String) : RequestBody() {
@@ -148,9 +155,16 @@ class RemoteTransport @Inject constructor() {
         listDirectory(server, path, requireComplete).entries
 
     internal fun listDirectory(server: RemoteServer, path: String, requireComplete: Boolean): DirectoryListing = when (server.protocol) {
-        RemoteProtocol.WebDav -> listDav(server, path, requireComplete).let { DirectoryListing(it.entries, complete = it.complete) }
+        RemoteProtocol.WebDav -> listDav(server, path, requireComplete).let {
+            DirectoryListing(it.entries, complete = it.complete, etag = it.folderEtag)
+        }
         RemoteProtocol.Ftp -> withFtp(server) { listFtp(it, path, requireComplete) }
     }
+
+    /** 폴더 자신의 ETag만 읽습니다. 하위 변경이 ETag에 전파되는 서버가 아니면 null입니다. */
+    internal fun folderEtag(server: RemoteServer, path: String): String? =
+        if (server.protocol != RemoteProtocol.WebDav) null
+        else listDav(server, path, requireComplete = true, depth = "0").folderEtag
 
     internal suspend fun listBeforeDeletion(server: RemoteServer, path: String): List<RemoteEntry> =
         if (server.protocol == RemoteProtocol.Ftp) withFtp(server) { listFtp(it, path, requireComplete = true, verifyNames = true).entries }
@@ -527,7 +541,11 @@ class RemoteTransport @Inject constructor() {
                     val url = sameOrigin(server, temp) ?: throw IOException()
                     val put = request(server, url).header("If-None-Match", "*").put(body)
                     if (body is SyncUploadBody) put.header("Want-Repr-Digest", "sha-256=10").header("Accept-Encoding", "identity")
-                    if (syncDigest != null) put.header("Content-Digest", "sha-256=:" + Base64.getEncoder().encodeToString(syncDigest) + ":")
+                    if (syncDigest != null) {
+                        put.header("Content-Digest", "sha-256=:" + Base64.getEncoder().encodeToString(syncDigest) + ":")
+                        // Nextcloud·ownCloud는 이 값을 파일과 함께 저장해 목록의 oc:checksums로 돌려준다.
+                        put.header("OC-Checksum", "SHA256:" + syncDigest.toByteString().hex())
+                    }
                     val hasVersion = execute(put.build(), fileHttp).use {
                         if (it.code !in listOf(200, 201, 204)) throw IOException()
                         if (body is SyncUploadBody) body.verify(it)
@@ -608,7 +626,7 @@ class RemoteTransport @Inject constructor() {
         }
     }
 
-    internal fun davChanges(server: RemoteServer, path: String, token: String?): DavListing? {
+    internal fun davChanges(server: RemoteServer, path: String, token: String?): DavChanges {
         val url = sameOrigin(server, path) ?: throw RemoteRequestException(RemoteFailure.Address)
         val escaped = android.text.TextUtils.htmlEncode(token.orEmpty())
         val report = """<d:sync-collection xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
@@ -618,15 +636,15 @@ class RemoteTransport @Inject constructor() {
             .method("REPORT", report.toRequestBody("application/xml; charset=utf-8".toMediaType())).build()
         http.newCall(query).execute().use { response ->
             if (response.code == 401) throw RemoteRequestException(RemoteFailure.Credentials)
-            if (response.code != 207) return null
-            val body = response.body ?: return null
+            if (response.code != 207) return DavChanges(null, rejected = response.code in REPORT_REJECTED)
+            val body = response.body ?: return DavChanges(null)
             return try {
-                parseDav(server, url, body.byteStream(), requireComplete = true, report = true)
+                DavChanges(parseDav(server, url, body.byteStream(), requireComplete = true, report = true))
             } catch (_: XmlPullParserException) {
-                null
+                DavChanges(null)
             } catch (_: IOException) {
                 // 잘린 변경 목록이나 일부 항목의 오류는 일반 목록으로 다시 확인한다.
-                null
+                DavChanges(null)
             }
         }
     }
@@ -643,6 +661,7 @@ class RemoteTransport @Inject constructor() {
         val entries = mutableListOf<RemoteEntry>()
         val removed = mutableListOf<String>()
         var token: String? = null
+        var folderEtag: String? = null
         var collectionFound = false
         var complete = true
         parser.children {
@@ -681,6 +700,8 @@ class RemoteTransport @Inject constructor() {
             if (segments == parent && properties.readable && (!requireComplete || properties.hasResourceType)) {
                 if (!properties.directory) throw RemoteRequestException(RemoteFailure.Address)
                 collectionFound = true
+                // 파일 ID를 알려 주는 서버(Nextcloud·ownCloud)는 하위 항목이 바뀌면 상위 폴더의 ETag도 바꾼다.
+                if (properties.fileId != null) folderEtag = properties.etag
                 if (!properties.hasResourceType) complete = false
                 return@children
             }
@@ -704,12 +725,15 @@ class RemoteTransport @Inject constructor() {
                 etag = properties.etag,
                 preview = properties.fileId?.let { nextcloudPreview(server, it) },
                 mimeType = properties.mimeType,
+                fileId = properties.fileId,
+                checksum = properties.checksum,
             )
         }
         if (report) {
             if (token == null) throw IOException("폴더 변경 토큰이 없습니다.")
         } else if (!single && !collectionFound && (requireComplete || entries.isEmpty())) throw IOException()
-        return DavListing(entries.distinctBy(RemoteEntry::path), removed, token, complete && (report || collectionFound))
+        return DavListing(entries.distinctBy(RemoteEntry::path), removed, token, complete && (report || collectionFound),
+            folderEtag.takeIf { !report })
     }
 
     private fun nextcloudPreview(server: RemoteServer, fileId: Long): String? {
@@ -862,6 +886,7 @@ private class DavProperties {
     var etag: String? = null
     var mimeType: String? = null
     var fileId: Long? = null
+    var checksum: String? = null
 
     fun readStatus(parser: XmlPullParser) {
         var success = false
@@ -882,6 +907,7 @@ private class DavProperties {
         etag = values.etag ?: etag
         mimeType = values.mimeType ?: mimeType
         fileId = values.fileId ?: fileId
+        checksum = values.checksum ?: checksum
     }
 
     private fun readProps(parser: XmlPullParser) = parser.children {
@@ -899,11 +925,26 @@ private class DavProperties {
             isDav("getetag") -> etag = nextText().takeIf(String::isNotBlank)
             isDav("getcontenttype") -> mimeType = nextText().substringBefore(';').trim().lowercase()
             namespace == "http://owncloud.org/ns" && name == "fileid" -> fileId = nextText().toLongOrNull()
+            namespace == "http://owncloud.org/ns" && name == "checksums" -> children {
+                if (namespace == "http://owncloud.org/ns" && name == "checksum") {
+                    nextText().trim().takeIf(String::isNotEmpty)?.let { value -> checksum = listOfNotNull(checksum, value).joinToString(" ") }
+                }
+            }
         }
     }
 }
 
-internal data class DavListing(val entries: List<RemoteEntry>, val removed: List<String>, val token: String?, val complete: Boolean)
+internal data class DavListing(
+    val entries: List<RemoteEntry>,
+    val removed: List<String>,
+    val token: String?,
+    val complete: Boolean,
+    // 목록과 같은 응답에서 읽은 폴더 자신의 ETag. 하위 변경이 전파되는 서버에서만 채운다.
+    val folderEtag: String? = null,
+)
 
-private const val DAV_PROP = "<d:prop><d:resourcetype/><d:getcontenttype/><d:getcontentlength/><d:getlastmodified/><d:getetag/><oc:fileid/></d:prop>"
+// 변경 목록 요청을 지원하지 않는 서버가 돌려주는 상태 코드. 일시적인 서버 오류(5xx)는 넣지 않는다.
+private val REPORT_REJECTED = setOf(400, 403, 405, 415, 422, 501)
+
+private const val DAV_PROP = "<d:prop><d:resourcetype/><d:getcontenttype/><d:getcontentlength/><d:getlastmodified/><d:getetag/><oc:fileid/><oc:checksums/></d:prop>"
 private const val DAV_PROPERTIES = """<d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">$DAV_PROP</d:propfind>"""

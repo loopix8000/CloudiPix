@@ -14,6 +14,7 @@ import app.cloudipix.gallery.core.media.EXTERNAL_STORAGE_DOCUMENTS
 import app.cloudipix.gallery.core.media.documentPath
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import okio.ByteString.Companion.decodeHex
 import okio.ByteString.Companion.toByteString
 import java.io.File
 import java.io.FileNotFoundException
@@ -45,6 +46,8 @@ internal interface LocalSyncStorage : LocalCopyStorage {
     fun copyAndHash(file: LocalDocument, output: OutputStream, checkActive: () -> Unit): String
     fun rename(file: LocalDocument, name: String): String
     fun renameChild(parent: String, id: String, from: String, name: String): String
+    /** [file]을 [parent] 폴더의 [name]으로 옮기고 새 문서 ID를 돌려준다. 같은 이름이 있으면 덮어쓰지 않고 실패한다. */
+    fun move(file: LocalDocument, parent: String, name: String): String
     fun requireWritableVolume()
     suspend fun stage(parent: String, name: String, write: suspend (OutputStream) -> Unit): LocalDraft
     fun storagePath(id: String): String?
@@ -221,6 +224,26 @@ internal class LocalSyncTree(private val context: Context, private val tree: Uri
         return renamedId
     }
 
+    override fun move(file: LocalDocument, parent: String, name: String): String {
+        val source = syncParentId(file.id)
+        if (source == parent) return renameChild(parent, file.id, file.name, name)
+        if (childDocument(parent, name) != null) throw IOException("로컬 대상에 같은 이름이 있습니다.")
+        val moved = try {
+            DocumentsContract.moveDocument(resolver, uri(file.id), uri(source), uri(parent))
+        } catch (error: RuntimeException) {
+            throw IOException("로컬 파일을 옮길 수 없습니다.", error)
+        } ?: throw IOException("로컬 파일을 옮길 수 없습니다.")
+        val movedId = DocumentsContract.getDocumentId(moved)
+        if (file.name == name) return movedId
+        return try {
+            renameChild(parent, movedId, file.name, name)
+        } catch (error: IOException) {
+            // 이름을 바꾸지 못하면 원래 폴더로 되돌려 반쯤 옮긴 상태를 남기지 않는다.
+            runCatching { DocumentsContract.moveDocument(resolver, moved, uri(parent), uri(source)) }
+            throw error
+        }
+    }
+
     private fun create(parent: String, mime: String, name: String): String {
         val created = DocumentsContract.createDocument(resolver, uri(parent), mime, name)
             ?: throw IOException("로컬 대상에 파일이나 폴더를 만들 수 없습니다.")
@@ -242,8 +265,16 @@ internal class LocalSyncTree(private val context: Context, private val tree: Uri
 
 internal const val EXTERNAL_STORAGE = EXTERNAL_STORAGE_DOCUMENTS
 internal fun syncChildId(parent: String, name: String) = if (parent.endsWith(':')) parent + name else "${parent.trimEnd('/')}/$name"
+internal fun syncParentId(id: String) = id.substringBeforeLast('/', id.substringBefore(':') + ":")
 internal fun syncKey(value: String) = value.lowercase(Locale.ROOT)
 internal fun ByteArray.hex(): String = toByteString().hex()
+
+/** 16진 SHA-256 해시를 32바이트로 바꾼다. 형식이 맞지 않으면 null을 돌려준다. */
+internal fun String.syncHashBytes(): ByteArray? = if (length != 64) null else try {
+    decodeHex().toByteArray()
+} catch (_: IllegalArgumentException) {
+    null
+}
 internal fun String.sha256(): String = MessageDigest.getInstance("SHA-256").digest(encodeToByteArray()).hex()
 
 private fun invalidNameCharacter(char: Char): Boolean = char.isISOControl() || char in "/\\\"*:<>?|"

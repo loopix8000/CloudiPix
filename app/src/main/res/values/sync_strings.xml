@@ -20,6 +20,8 @@
     <string name="sync_excluded_previous_folder">Previous folder excluded from sync · %1$s</string>
     <string name="sync_final_destination">Save files to</string>
     <string name="sync_scheduled">Scheduled sync</string>
+    <string name="sync_scheduled_unmetered">Scheduled sync on Wi-Fi only</string>
+    <string name="sync_scheduled_unmetered_hint">On mobile data and other metered networks, scheduled runs only refresh cloud folder listings. Syncs after you take or move photos, and syncs you start yourself, still run.</string>
     <string name="sync_interval_value">Sync interval · %1$d min</string>
     <string name="sync_interval_hint">Refreshes linked cloud folder listings at this interval and syncs files for folders with sync enabled. Android may delay scheduled runs.</string>
     <string name="sync_change_interval">Change interval</string>

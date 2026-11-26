@@ -101,6 +101,16 @@ internal class LocalFileTree(private val context: Context, tree: Uri) : LocalSyn
         return targetId
     }
 
+    override fun move(file: LocalDocument, parent: String, name: String): String {
+        if (!validSyncName(name)) throw IOException("로컬 대상에서 요청한 이름을 사용할 수 없습니다.")
+        val targetId = syncChildId(parent, name)
+        val target = file(targetId)
+        if (target.exists()) throw IOException("로컬 대상에 같은 이름이 있습니다.")
+        // 같은 저장소 안의 이름 변경이라 내용을 복사하지 않는다. 대상이 생기면 덮어쓰지 않고 실패한다.
+        Files.move(file(file.id).toPath(), target.toPath())
+        return targetId
+    }
+
     override fun delete(id: String) {
         val target = file(id)
         val deleted = if (target.isDirectory) target.deleteRecursively() else target.delete()

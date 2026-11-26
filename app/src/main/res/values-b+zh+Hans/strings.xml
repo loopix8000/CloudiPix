@@ -608,6 +608,8 @@
     <string name="sync_excluded_previous_folder">原文件夹已排除在同步之外 · %1$s</string>
     <string name="sync_final_destination">文件保存位置</string>
     <string name="sync_scheduled">定时同步</string>
+    <string name="sync_scheduled_unmetered">仅在 Wi-Fi 下定时同步</string>
+    <string name="sync_scheduled_unmetered_hint">在移动数据等按流量计费的网络上，定时任务只刷新云端文件夹列表。拍摄或移动照片后的同步以及手动开始的同步仍会照常执行。</string>
     <string name="sync_interval_value">同步间隔 · %1$d 分钟</string>
     <string name="sync_interval_hint">按此间隔刷新已关联云端文件夹的列表，并同步已开启同步的文件夹。Android 可能会推迟计划任务。</string>
     <string name="sync_change_interval">更改间隔</string>

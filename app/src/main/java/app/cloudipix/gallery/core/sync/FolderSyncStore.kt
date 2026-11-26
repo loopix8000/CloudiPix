@@ -103,6 +103,8 @@ internal data class StoredSyncPreferences(
     val conflictPolicy: SyncConflictPolicy = SyncConflictPolicy.KeepBoth,
     val fileFilters: SyncFileFilterSettings = SyncFileFilterSettings(),
     val scheduledSyncEnabled: Boolean = true,
+    // 켜면 데이터 요금이 드는 네트워크에서는 예약 실행의 파일 동기화를 건너뛴다.
+    val scheduledSyncUnmeteredOnly: Boolean = false,
 )
 
 @Serializable
@@ -210,7 +212,7 @@ internal class FolderSyncStore @Inject constructor(@ApplicationContext context: 
                 if (!index.imported(id)) {
                     val old = legacy.readOr(emptyMap<String, SyncedFile>())
                     old.entries.chunked(500).forEach { batch ->
-                        index.putFiles(batch.map { (path, file) -> file.row(id, path) })
+                        index.putFiles(batch.mapNotNull { (path, file) -> file.row(id, path) })
                     }
                     index.markImported(ImportedSyncRoot(id))
                 }
@@ -230,16 +232,18 @@ internal class FolderSyncStore @Inject constructor(@ApplicationContext context: 
                 ancestorsAndFiles + index.filesInRange(id, "$key/", "${key}0")
             }
         }
-        SyncFileIndex(rows.associateTo(mutableMapOf()) { it.path to SyncedFile(it.hash, it.local, it.remote) })
+        SyncFileIndex(rows.associateTo(mutableMapOf()) { it.path to SyncedFile(it.hash.hex(), it.local, it.remote) })
     }
 
     fun saveFiles(id: String, files: SyncFileIndex) = indexAccess {
         if (files.dirty.isNotEmpty()) {
             db.runInTransaction {
                 for (batch in files.dirty.chunked(500)) {
-                    val removed = batch.filterNot(files::containsKey)
+                    // 해시 형식이 맞지 않는 기록은 이전 값이 남지 않도록 지운 것으로 처리한다.
+                    val rows = batch.associateWith { path -> files[path]?.row(id, path) }
+                    val removed = rows.filterValues { it == null }.keys.toList()
                     if (removed.isNotEmpty()) index.deleteFiles(id, removed)
-                    index.putFiles(batch.mapNotNull { path -> files[path]?.row(id, path) })
+                    index.putFiles(rows.values.filterNotNull())
                 }
             }
             files.dirty.clear()
@@ -277,7 +281,8 @@ internal class SyncFileIndex(private val records: MutableMap<String, SyncedFile>
     }
 }
 
-private fun SyncedFile.row(id: String, path: String) = SyncFileRow(id, path, syncKey(path), hash, local, remote)
+private fun SyncedFile.row(id: String, path: String) =
+    hash.syncHashBytes()?.let { SyncFileRow(id, path, syncKey(path), it, local, remote) }
 
 private inline fun <T> indexAccess(block: () -> T): T = try {
     block()

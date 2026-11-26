@@ -1,0 +1,248 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "f16e93b83b31655294e319944bb06437",
+    "entities": [
+      {
+        "tableName": "sync_files",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`root` TEXT NOT NULL, `path` TEXT NOT NULL, `foldedPath` TEXT NOT NULL, `hash` BLOB NOT NULL, `local_size` INTEGER NOT NULL, `local_modified` INTEGER NOT NULL, `local_etag` TEXT, `local_fileId` INTEGER, `remote_size` INTEGER, `remote_modified` INTEGER, `remote_etag` TEXT, `remote_fileId` INTEGER, PRIMARY KEY(`root`, `path`))",
+        "fields": [
+          {
+            "fieldPath": "root",
+            "columnName": "root",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "path",
+            "columnName": "path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foldedPath",
+            "columnName": "foldedPath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hash",
+            "columnName": "hash",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "local.size",
+            "columnName": "local_size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "local.modified",
+            "columnName": "local_modified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "local.etag",
+            "columnName": "local_etag",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "local.fileId",
+            "columnName": "local_fileId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "remote.size",
+            "columnName": "remote_size",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "remote.modified",
+            "columnName": "remote_modified",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "remote.etag",
+            "columnName": "remote_etag",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "remote.fileId",
+            "columnName": "remote_fileId",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "root",
+            "path"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_sync_files_root_foldedPath",
+            "unique": false,
+            "columnNames": [
+              "root",
+              "foldedPath"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sync_files_root_foldedPath` ON `${TABLE_NAME}` (`root`, `foldedPath`)"
+          }
+        ]
+      },
+      {
+        "tableName": "imported_sync_roots",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`root` TEXT NOT NULL, PRIMARY KEY(`root`))",
+        "fields": [
+          {
+            "fieldPath": "root",
+            "columnName": "root",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "root"
+          ]
+        }
+      },
+      {
+        "tableName": "dav_directories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`directory` INTEGER NOT NULL, `server` TEXT NOT NULL, `token` TEXT, `etag` TEXT, `checkedAt` INTEGER NOT NULL, PRIMARY KEY(`directory`))",
+        "fields": [
+          {
+            "fieldPath": "directory",
+            "columnName": "directory",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "server",
+            "columnName": "server",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "token",
+            "columnName": "token",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "etag",
+            "columnName": "etag",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "checkedAt",
+            "columnName": "checkedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "directory"
+          ]
+        }
+      },
+      {
+        "tableName": "dav_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`directoryId` INTEGER NOT NULL, `path` TEXT NOT NULL, `name` TEXT NOT NULL, `directory` INTEGER NOT NULL, `modified` INTEGER NOT NULL, `size` INTEGER NOT NULL, `etag` TEXT, `preview` TEXT, `mimeType` TEXT, `unsupported` INTEGER NOT NULL, `modifiedTimeIsApproximate` INTEGER NOT NULL, `fileId` INTEGER, `checksum` TEXT, PRIMARY KEY(`directoryId`, `name`))",
+        "fields": [
+          {
+            "fieldPath": "directoryId",
+            "columnName": "directoryId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entry.path",
+            "columnName": "path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entry.name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entry.directory",
+            "columnName": "directory",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entry.modified",
+            "columnName": "modified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entry.size",
+            "columnName": "size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entry.etag",
+            "columnName": "etag",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "entry.preview",
+            "columnName": "preview",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "entry.mimeType",
+            "columnName": "mimeType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "entry.unsupported",
+            "columnName": "unsupported",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entry.modifiedTimeIsApproximate",
+            "columnName": "modifiedTimeIsApproximate",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entry.fileId",
+            "columnName": "fileId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "entry.checksum",
+            "columnName": "checksum",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "directoryId",
+            "name"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f16e93b83b31655294e319944bb06437')"
+    ]
+  }
+}

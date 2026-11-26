@@ -35,7 +35,9 @@ object AppModule {
     @Singleton
     internal fun syncIndexDatabase(@ApplicationContext context: Context): SyncIndexDatabase {
         val file = File(context.noBackupFilesDir, "sync-index.db")
-        return Room.databaseBuilder(context, SyncIndexDatabase::class.java, file.absolutePath).build()
+        return Room.databaseBuilder(context, SyncIndexDatabase::class.java, file.absolutePath)
+            .addMigrations(*SyncIndexDatabase.MIGRATIONS)
+            .build()
     }
 
     @Provides fun mediaDao(database: GalleryDatabase): MediaDao = database.mediaDao()

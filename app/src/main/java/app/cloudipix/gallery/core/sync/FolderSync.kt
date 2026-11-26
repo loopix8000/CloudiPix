@@ -2,6 +2,7 @@ package app.cloudipix.gallery.core.sync
 
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Environment
 import android.os.SystemClock
@@ -116,6 +117,7 @@ internal data class FolderSyncSettingsExport(
     val cloudFolders: List<CloudFolderBackup>? = null,
     val fileFilters: SyncFileFilterSettings? = null,
     val scheduledSyncEnabled: Boolean? = null,
+    val scheduledSyncUnmeteredOnly: Boolean? = null,
 )
 
 @Serializable
@@ -163,6 +165,8 @@ class FolderSync @Inject internal constructor(
     internal val interval = minutes.asStateFlow()
     private val scheduled = MutableStateFlow(StoredSyncPreferences().scheduledSyncEnabled)
     internal val scheduledSyncEnabled = scheduled.asStateFlow()
+    private val unmeteredOnly = MutableStateFlow(StoredSyncPreferences().scheduledSyncUnmeteredOnly)
+    internal val scheduledSyncUnmeteredOnly = unmeteredOnly.asStateFlow()
     private val selectedConflictPolicy = MutableStateFlow(StoredSyncPreferences().conflictPolicy)
     internal val conflictPolicy = selectedConflictPolicy.asStateFlow()
     internal val fileFilters = store.fileFilters
@@ -195,6 +199,7 @@ class FolderSync @Inject internal constructor(
             FolderSyncSettingsExport(
                 intervalMinutes = interval.value,
                 scheduledSyncEnabled = scheduled.value,
+                scheduledSyncUnmeteredOnly = unmeteredOnly.value,
                 conflictPolicy = conflictPolicy.value,
                 defaultLocalPath = defaultRoot.value.label,
                 folders = servers.syncTargets().map { (server, folder, sync) ->
@@ -245,6 +250,7 @@ class FolderSync @Inject internal constructor(
         val savedRoot = restoredRoot ?: root.value
         val saved = store.preferences()
         val restoredSchedule = backup.scheduledSyncEnabled ?: saved.scheduledSyncEnabled
+        val restoredUnmetered = backup.scheduledSyncUnmeteredOnly ?: saved.scheduledSyncUnmeteredOnly
         val restoredFilters = backup.fileFilters?.let { imported ->
             val mapped = imported.folders.mapNotNull { filter ->
                 cloud.serverIds[filter.serverId]?.let { filter.copy(serverId = it) }
@@ -254,6 +260,7 @@ class FolderSync @Inject internal constructor(
         store.savePreferences(saved.copy(
             interval = backup.intervalMinutes,
             scheduledSyncEnabled = restoredSchedule,
+            scheduledSyncUnmeteredOnly = restoredUnmetered,
             conflictPolicy = backup.conflictPolicy,
             defaultRoot = savedRoot.takeUnless { it == builtInRoot },
             fileFilters = restoredFilters,
@@ -261,6 +268,7 @@ class FolderSync @Inject internal constructor(
         root.value = savedRoot
         minutes.value = backup.intervalMinutes
         scheduled.value = restoredSchedule
+        unmeteredOnly.value = restoredUnmetered
         selectedConflictPolicy.value = backup.conflictPolicy
         scheduler.schedule(backup.intervalMinutes, servers.any(RemoteServer::hasLinkedFolders), restoredSchedule)
 
@@ -381,6 +389,7 @@ class FolderSync @Inject internal constructor(
         }
         minutes.value = saved.interval
         scheduled.value = saved.scheduledSyncEnabled
+        unmeteredOnly.value = saved.scheduledSyncUnmeteredOnly
         selectedConflictPolicy.value = saved.conflictPolicy
         preferencesLoaded = !retryHistory
     }
@@ -685,6 +694,19 @@ class FolderSync @Inject internal constructor(
             scheduler.schedule(minutes.value, hasLinkedFolders(), enabled)
         }
     }
+
+    internal suspend fun setScheduledSyncUnmeteredOnly(enabled: Boolean) = withContext(Dispatchers.IO) {
+        operations.withLock {
+            loadPreferencesLocked()
+            if (unmeteredOnly.value == enabled) return@withLock
+            store.savePreferences(store.preferences().copy(scheduledSyncUnmeteredOnly = enabled))
+            unmeteredOnly.value = enabled
+        }
+    }
+
+    // 작업 제약 대신 실행할 때 확인한다. 인터넷 연결이 확인되지 않은 내부망 Wi-Fi에서도 예약 동기화가 돌아야 하기 때문이다.
+    private fun isMeteredNetwork(): Boolean =
+        context.getSystemService(ConnectivityManager::class.java)?.isActiveNetworkMetered ?: true
 
     internal suspend fun setConflictPolicy(value: SyncConflictPolicy) = withContext(Dispatchers.IO) {
         operations.withLock {
@@ -1091,6 +1113,8 @@ class FolderSync @Inject internal constructor(
         val ids = operations.withLock {
             loadPreferencesLocked()
             if (refreshCloudFolders && !scheduled.value) return@withContext SyncOutcome.Success
+            // 데이터 요금이 드는 네트워크에서는 예약 실행의 파일 동기화를 건너뛰고 클라우드 폴더 목록만 갱신한다.
+            if (refreshCloudFolders && unmeteredOnly.value && isMeteredNetwork()) return@withLock emptyList()
             configured().filter { it.isVisibleSyncTarget() && (id == null || it.sync.id == id) }.map { it.sync.id }
         }
         if (ids.isEmpty()) {
@@ -1273,7 +1297,8 @@ class FolderSync @Inject internal constructor(
                     "localListMs=${run.localListMs} remoteListMs=${run.remoteListMs} listWallMs=${run.listingWallMs} " +
                     "peakComparisons=${run.peakComparisons} transferWaitMs=${run.transferWaitMs} " +
                     "otherMs=${durationMs - run.listingWallMs - run.transferWaitMs} listRequests=${reads.listingRequests} " +
-                    "sharedLists=${reads.sharedListings} downloadedBytes=${reads.downloadedBytes.get()}")
+                    "sharedLists=${reads.sharedListings} cachedLists=${reads.cachedListings} " +
+                    "downloadedBytes=${reads.downloadedBytes.get()}")
             }
             store.saveResult(target.folderId, location.id, FolderSyncHistoryEntry(result, automatic, label, durationMs),
                 rootStatus.takeIf { partial })
