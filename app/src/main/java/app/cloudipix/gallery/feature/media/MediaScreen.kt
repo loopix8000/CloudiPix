@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
@@ -444,13 +445,16 @@ internal fun MediaTile(
     Box(cell) {
         val inset = if (selected) Modifier.padding(SelectedInset) else Modifier
         val uri = medium.displayUri
+        // 맵을 직접 읽으면 어느 칸의 값이 바뀌어도 보이는 칸이 모두 다시 구성되므로, 이 칸의 값이 바뀔 때만 다시 구성한다.
+        val preview by remember(thumbnails, uri) { derivedStateOf { thumbnails.previews[uri] } }
+        val loadFull by remember(thumbnails, uri) { derivedStateOf { uri in thumbnails.full } }
         MediaThumbnail(
             model = uri,
             modifier = Modifier.fillMaxSize().then(inset).then(thumbnailModifier),
             description = medium.name,
             quickPreview = false,
-            bufferedPreview = thumbnails.previews[uri],
-            loadFull = uri in thumbnails.full,
+            bufferedPreview = preview,
+            loadFull = loadFull,
             onFullFinished = { thumbnails.finish(uri) },
             indexed = medium.indexedMedia,
         )
