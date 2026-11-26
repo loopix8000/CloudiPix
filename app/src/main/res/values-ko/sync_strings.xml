@@ -78,11 +78,13 @@
     <string name="sync_now">지금 동기화</string>
     <string name="sync_history_open">기록</string>
     <string name="sync_history_title">동기화 기록</string>
+    <string name="sync_all_history_title">전체 동기화 기록</string>
     <string name="sync_history_duration">소요 시간 %1$s</string>
     <string name="sync_history_under_second">소요 시간 1초 미만</string>
     <string name="sync_history_loading">동기화 기록을 불러오는 중…</string>
     <string name="sync_history_empty">아직 동기화 기록이 없습니다.</string>
     <string name="sync_history_error">동기화 기록을 읽을 수 없습니다.</string>
+    <string name="sync_history_partial_error">일부 동기화 기록을 읽을 수 없습니다.</string>
     <string name="sync_history_completed">완료</string>
     <string name="sync_history_failed">실패</string>
     <string name="sync_history_conflicts">미해결 충돌</string>

@@ -283,6 +283,9 @@ class RemoteGallery @Inject internal constructor(
         return registered.value
     }
 
+    internal fun observeConnectionsForSync(): Flow<List<RemoteServer>> =
+        registered.onStart { requireConnections() }
+
     internal suspend fun linkedFolder(serverId: String, path: String): Pair<RemoteServer, RemoteFolder> {
         requireConnections()
         val server = server(serverId)

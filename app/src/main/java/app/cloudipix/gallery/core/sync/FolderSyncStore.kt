@@ -11,9 +11,11 @@ import app.cloudipix.gallery.core.remote.RemoteFolderSync
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -130,6 +132,8 @@ internal class FolderSyncStore @Inject constructor(@ApplicationContext context: 
     private val directory = File(context.noBackupFilesDir, "folder-sync")
     private val settings = AtomicFile(File(directory, "settings.json"))
     private val cleanup = AtomicFile(File(directory, "local-cleanup.json"))
+    private val runRevisions = MutableStateFlow<Map<Long, Long>>(emptyMap())
+    val historyRevisions = runRevisions.asStateFlow()
     private val currentFileFilters = MutableStateFlow<SyncFileFilterSettings?>(null)
     val fileFilters = currentFileFilters.filterNotNull().onStart {
         if (currentFileFilters.value == null) try {
@@ -161,6 +165,7 @@ internal class FolderSyncStore @Inject constructor(@ApplicationContext context: 
         val previous = status(location.id).readOr<FolderSyncStatus?>(null) ?: legacy
         if (previous?.lastRun != null) {
             file.write(saved.prepend(location.id, FolderSyncHistoryEntry(previous, localLabel = location.localLabel)))
+            historyChanged(folderId)
         }
         return previous
     }
@@ -175,13 +180,28 @@ internal class FolderSyncStore @Inject constructor(@ApplicationContext context: 
             StoredSyncRuns()
         }
         file.write(saved.prepend(syncId, entry).copy(rootStatus = rootStatus))
+        historyChanged(folderId)
     }
 
     @Synchronized
     fun readRuns(folderId: Long): List<FolderSyncHistoryEntry> = runs(folderId).readOr(StoredSyncRuns()).entries
 
     @Synchronized
-    fun removeRuns(folderId: Long) = runs(folderId).delete()
+    fun removeRuns(folderId: Long) {
+        runs(folderId).delete()
+        historyChanged(folderId)
+    }
+
+    fun historyFolderIds(): Set<Long>? = directory.list()?.mapNotNullTo(hashSetOf()) { name ->
+        val base = name.removeSuffix(".bak")
+        if (base.startsWith("runs-") && base.endsWith(".json")) {
+            base.removePrefix("runs-").removeSuffix(".json").toLongOrNull()
+        } else null
+    }
+
+    private fun historyChanged(folderId: Long) {
+        runRevisions.update { it + (folderId to ((it[folderId] ?: 0L) + 1)) }
+    }
 
     fun readFiles(id: String, paths: Set<String>? = null, subfolder: String? = null): SyncFileIndex = indexAccess {
         val legacy = fileIndex(id)

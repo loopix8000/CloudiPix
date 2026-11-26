@@ -465,7 +465,7 @@ private fun SyncHistoryScreen(link: ConnectedFolder, viewModel: FolderSyncViewMo
 }
 
 @Composable
-private fun SyncHistoryRow(entry: FolderSyncHistoryEntry) {
+internal fun SyncHistoryRow(entry: FolderSyncHistoryEntry, folderLabel: String? = null) {
     val result = entry.result
     val outcome = when {
         result.failed -> R.string.sync_history_failed
@@ -473,6 +473,7 @@ private fun SyncHistoryRow(entry: FolderSyncHistoryEntry) {
         else -> R.string.sync_history_completed
     }
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        folderLabel?.let { SyncText(it, muted = false) }
         val label = stringResource(outcome)
         val trigger = entry.automatic?.let { stringResource(if (it) R.string.sync_history_automatic else R.string.sync_history_manual) }
         val duration = entry.durationMs?.let {
@@ -803,7 +804,7 @@ private fun SyncPath(@StringRes label: Int, path: String) {
 }
 
 @Composable
-private fun SyncText(text: String, muted: Boolean = true) {
+internal fun SyncText(text: String, muted: Boolean = true) {
     val colors = GalleryTheme.colors
     Text(text, style = if (muted) GalleryTheme.type.meta else GalleryTheme.type.body,
         color = if (muted) colors.textMuted else colors.text)

@@ -56,9 +56,12 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -77,6 +80,19 @@ import javax.inject.Singleton
 internal const val MIN_SYNC_INTERVAL = 15
 
 internal enum class AlbumSyncState { Incomplete, Syncing, Complete }
+
+internal data class SyncHistoryItem(val folderLabel: String, val entry: FolderSyncHistoryEntry)
+
+internal data class AllFolderSyncHistory(
+    val items: List<SyncHistoryItem>,
+    val hasReadError: Boolean = false,
+)
+
+private data class CachedFolderHistory(
+    val revision: Long?,
+    val entries: List<FolderSyncHistoryEntry>,
+    val failed: Boolean,
+)
 
 internal enum class SyncSetupIssue { Location, Overlap }
 internal enum class SyncLocationMode { Default, SelectedFolder, ChildFolder }
@@ -157,7 +173,6 @@ class FolderSync @Inject internal constructor(
     private val root = MutableStateFlow(builtInRoot)
     internal val defaultRoot = root.asStateFlow()
     private val status = MutableStateFlow<Map<String, FolderSyncStatus>>(emptyMap())
-    private val historyRevision = MutableStateFlow(0L)
     internal val results = status.asStateFlow()
     private val active = MutableStateFlow<Map<String, FolderSyncProgress>>(emptyMap())
     internal val progress = active.asStateFlow()
@@ -801,13 +816,59 @@ class FolderSync @Inject internal constructor(
         Unit
     }
 
-    internal fun runHistory(folderId: Long): Flow<Result<List<FolderSyncHistoryEntry>>> = combine(results, historyRevision) { _, _ ->
-        try {
-            Result.success(store.readRuns(folderId))
-        } catch (error: IOException) {
-            Result.failure(error)
+    internal fun runHistory(folderId: Long): Flow<Result<List<FolderSyncHistoryEntry>>> = store.historyRevisions
+        .map { it[folderId] }
+        .distinctUntilChanged()
+        .map { readHistory(folderId) }
+        .flowOn(Dispatchers.IO)
+
+    internal fun allRunHistory(): Flow<AllFolderSyncHistory> = flow {
+        val existingIds = store.historyFolderIds()
+        val cached = mutableMapOf<Long, CachedFolderHistory>()
+        val folders = gallery.observeConnectionsForSync().map { servers ->
+            buildMap {
+                for (server in servers) {
+                    for (folder in server.folders.orEmpty()) {
+                        if (folder.linked) put(remoteId(server.id, folder.path), "${server.name} · ${folder.displayPath}")
+                    }
+                }
+            }
+        }.distinctUntilChanged()
+
+        val history = combine(folders, store.historyRevisions) { labels, revisions ->
+            cached.keys.retainAll(labels.keys)
+            var hasReadError = false
+            val items = buildList {
+                for ((folderId, label) in labels) {
+                    val revision = revisions[folderId]
+                    if (existingIds != null && folderId !in existingIds && revision == null) continue
+                    currentCoroutineContext().ensureActive()
+                    val previous = cached[folderId]
+                    val folder = if (previous != null && previous.revision == revision) previous else {
+                        val runs = readHistory(folderId)
+                        val entries = runs.getOrNull()?.map { entry ->
+                            entry.copy(result = entry.result.copy(subfolders = emptyMap()))
+                        }
+                        CachedFolderHistory(revision, entries ?: previous?.entries.orEmpty(), runs.isFailure)
+                            .also { cached[folderId] = it }
+                    }
+                    hasReadError = hasReadError || folder.failed
+                    folder.entries.forEach { add(SyncHistoryItem(label, it)) }
+                }
+            }.sortedByDescending { it.entry.result.lastRun }
+            AllFolderSyncHistory(items, hasReadError)
         }
-    }.distinctUntilChanged().flowOn(Dispatchers.IO)
+        emitAll(history)
+    }.catch { error ->
+        if (error !is IOException) throw error
+        emit(AllFolderSyncHistory(emptyList(), hasReadError = true))
+    }.flowOn(Dispatchers.IO)
+
+    private fun readHistory(folderId: Long): Result<List<FolderSyncHistoryEntry>> = try {
+        Result.success(store.readRuns(folderId))
+    } catch (error: IOException) {
+        Result.failure(error)
+    }
 
     private suspend fun <T> changeLinks(
         loadPreferences: Boolean = true, cleanCopiesOf: (SyncTarget) -> Boolean = { false }, change: suspend () -> T,
@@ -1217,7 +1278,6 @@ class FolderSync @Inject internal constructor(
             store.saveResult(target.folderId, location.id, FolderSyncHistoryEntry(result, automatic, label, durationMs),
                 rootStatus.takeIf { partial })
             status.update { it + (location.id to rootStatus) }
-            historyRevision.update { it + 1 }
         } catch (_: IOException) {
             status.update { it + (location.id to rootStatus.copy(failed = true)) }
             outcome = SyncOutcome.Retry

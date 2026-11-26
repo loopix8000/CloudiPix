@@ -74,6 +74,7 @@ import app.cloudipix.gallery.feature.media.MediaScreen
 import app.cloudipix.gallery.feature.security.FolderAccessGate
 import app.cloudipix.gallery.feature.settings.IgnoredFoldersScreen
 import app.cloudipix.gallery.feature.settings.FolderSyncScreen
+import app.cloudipix.gallery.feature.settings.CloudSyncHistoryScreen
 import app.cloudipix.gallery.feature.settings.CloudSyncSettingsScreen
 import app.cloudipix.gallery.feature.settings.RemoteSourcesScreen
 import app.cloudipix.gallery.feature.settings.RemoteServerDetailsScreen
@@ -124,6 +125,9 @@ data class FolderSyncOptions(val albumId: Long? = null, val serverId: String? = 
 
 @Serializable
 object CloudSyncSettings
+
+@Serializable
+object CloudSyncHistory
 
 @Serializable
 object Search
@@ -423,7 +427,13 @@ fun GalleryNavHost(
                     )
                 }
                 settingsComposable<CloudSyncSettings>(settingsState) {
-                    CloudSyncSettingsScreen(onBack = navController::popBackStack)
+                    CloudSyncSettingsScreen(
+                        onBack = navController::popBackStack,
+                        onOpenHistory = { navController.navigate(CloudSyncHistory) },
+                    )
+                }
+                settingsComposable<CloudSyncHistory>(settingsState) {
+                    CloudSyncHistoryScreen(onBack = navController::popBackStack)
                 }
                 settingsComposable<About>(settingsState) {
                     AboutPage(onBack = navController::popBackStack)
@@ -479,7 +489,8 @@ private inline fun <reified T : Any> NavGraphBuilder.settingsComposable(
 private fun NavDestination.isSettingsDestination(): Boolean =
     hasRoute<Settings>() || hasRoute<About>() || hasRoute<ActionBars>() || hasRoute<IgnoredFolders>() ||
         hasRoute<RemoteSources>() || hasRoute<RemoteServerDetails>() || hasRoute<RemoteServerSettings>() ||
-        hasRoute<RemoteFolderPicker>() || hasRoute<FolderSyncOptions>() || hasRoute<CloudSyncSettings>()
+        hasRoute<RemoteFolderPicker>() || hasRoute<FolderSyncOptions>() || hasRoute<CloudSyncSettings>() ||
+        hasRoute<CloudSyncHistory>()
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.involvesSettings(): Boolean =
     initialState.destination.isSettingsDestination() || targetState.destination.isSettingsDestination()

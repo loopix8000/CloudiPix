@@ -79,11 +79,13 @@
     <string name="sync_now">Sync now</string>
     <string name="sync_history_open">History</string>
     <string name="sync_history_title">Sync history</string>
+    <string name="sync_all_history_title">All sync history</string>
     <string name="sync_history_duration">Duration %1$s</string>
     <string name="sync_history_under_second">Duration under 1 second</string>
     <string name="sync_history_loading">Loading sync history…</string>
     <string name="sync_history_empty">No sync runs yet.</string>
     <string name="sync_history_error">Could not read sync history.</string>
+    <string name="sync_history_partial_error">Could not read some sync records.</string>
     <string name="sync_history_completed">Completed</string>
     <string name="sync_history_failed">Failed</string>
     <string name="sync_history_conflicts">Unresolved conflicts</string>

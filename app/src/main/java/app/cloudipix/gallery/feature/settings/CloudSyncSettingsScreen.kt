@@ -54,7 +54,11 @@ class CloudSyncSettingsViewModel @Inject constructor(sync: FolderSync) : SyncSet
 }
 
 @Composable
-fun CloudSyncSettingsScreen(onBack: () -> Unit, viewModel: CloudSyncSettingsViewModel = hiltViewModel()) {
+fun CloudSyncSettingsScreen(
+    onBack: () -> Unit,
+    onOpenHistory: () -> Unit,
+    viewModel: CloudSyncSettingsViewModel = hiltViewModel(),
+) {
     val context = LocalContext.current
     val root by viewModel.defaultRoot.collectAsStateWithLifecycle()
     val interval by viewModel.interval.collectAsStateWithLifecycle()
@@ -92,6 +96,9 @@ fun CloudSyncSettingsScreen(onBack: () -> Unit, viewModel: CloudSyncSettingsView
             LinkRow(stringResource(R.string.sync_notification_settings), hint = null, horizontalPadding = 0.dp) {
                 context.startActivity(SyncNotifications.settingsIntent(context))
             }
+            HorizontalDivider(color = colors.hairline)
+            LinkRow(stringResource(R.string.sync_all_history_title), hint = null,
+                horizontalPadding = 0.dp, onClick = onOpenHistory)
             error?.let { Text(stringResource(it), style = GalleryTheme.type.body, color = colors.text) }
         }
     }
