@@ -10,15 +10,19 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntSize
 import app.cloudipix.gallery.core.media.Thumbnail
+import app.cloudipix.gallery.core.media.indexedMedia
 import app.cloudipix.gallery.core.model.GridItem
 import app.cloudipix.gallery.core.model.MediaType
+import app.cloudipix.gallery.core.model.Medium
 import coil3.BitmapImage
 import coil3.SingletonImageLoader
 import coil3.memory.MemoryCache
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
+import coil3.size.Precision
 import coil3.size.Scale
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -41,7 +45,10 @@ internal class AlbumThumbnails {
     }
 }
 
-/** 화면에 보이는 칸 수를 한 페이지로 삼아 앞뒤 한 페이지의 작은 미리보기만 보관한다. */
+/**
+ * 화면에 보이는 칸 수를 한 페이지로 삼아 앞뒤 한 페이지의 작은 미리보기만 보관한다.
+ * 보이는 칸의 고화질 썸네일이 디스크에 이미 있으면 작은 미리보기 대신 칸 크기로 바로 읽어 메모리에 올린다.
+ */
 @Composable
 internal fun rememberAlbumThumbnails(
     grid: LazyGridState,
@@ -62,16 +69,23 @@ internal fun rememberAlbumThumbnails(
         var nearby = emptyList<Uri>()
         var nearbyBatch = emptyList<Uri>()
         var scrollingBackward = false
+        // 미리보기를 고를 수 있는 칸의 항목과 격자 칸 크기. 칸 크기는 고화질 요청과 같은 크기로 디스크 썸네일을 읽는 데 쓴다.
+        val known = HashMap<Uri, Medium>()
+        var cellSize: IntSize? = null
 
         fun photos(indices: IntProgression): List<Uri> = indices.mapNotNull { index ->
-            (items.getOrNull(index) as? GridItem.Item)?.medium?.takeIf { it.type != MediaType.Video }?.displayUri
+            (items.getOrNull(index) as? GridItem.Item)?.medium?.takeIf { it.type != MediaType.Video }?.let { medium ->
+                medium.displayUri.also { known[it] = medium }
+            }
         }
 
         launch {
             snapshotFlow {
                 val cells = grid.layoutInfo.visibleItemsInfo
-                cells.groupBy({ it.row }, { it.index - leadingItems }).values.toList() to grid.lastScrolledBackward
-            }.collect { (rows, backward) ->
+                val size = cells.firstOrNull { items.getOrNull(it.index - leadingItems) is GridItem.Item }?.size
+                Triple(cells.groupBy({ it.row }, { it.index - leadingItems }).values.toList(), grid.lastScrolledBackward, size)
+            }.collect { (rows, backward, size) ->
+                cellSize = size
                 visibleRows = rows.map { row ->
                     row.mapNotNull { index -> (items.getOrNull(index) as? GridItem.Item)?.medium?.displayUri }
                 }
@@ -91,6 +105,7 @@ internal fun rememberAlbumThumbnails(
                 nearbyBatch = if (backward == scrollingBackward) nearbyBatch.filter { it in retained } else emptyList()
                 scrollingBackward = backward
                 previews.keys.retainAll(retained)
+                known.keys.retainAll(retained)
                 visibleMisses.retainAll(retained)
                 nearbyMisses.retainAll(retained)
                 running.forEach { (uri, job) -> if (uri !in retained) job.cancel() }
@@ -107,9 +122,23 @@ internal fun rememberAlbumThumbnails(
             for (uri in candidates) {
                 if (available <= 0) break
                 if (uri in running || !needsPreview(uri, misses)) continue
+                val indexed = known[uri]?.indexedMedia
+                // 고화질 차례가 아직 오지 않은 보이는 칸만 디스크를 먼저 본다. 차례가 온 칸은 고화질 요청이 직접 읽는다.
+                val cell = cellSize?.takeIf { !prefetch && uri !in album.full && it.width > 0 && it.height > 0 }
                 val job = launch {
+                    if (cell != null) {
+                        // 고화질 요청과 같은 키·크기로 읽어 메모리에 두면 고화질 칸이 바로 그려지고 같은 파일을 두 번 디코딩하지 않는다.
+                        val cached = ImageRequest.Builder(context)
+                            .data(Thumbnail(uri, indexed = indexed, cachedOnly = true))
+                            .size(cell.width, cell.height)
+                            .scale(Scale.FILL)
+                            .precision(Precision.EXACT)
+                            .build()
+                        if (loader.execute(cached) is SuccessResult) return@launch
+                        ensureActive()
+                    }
                     val request = ImageRequest.Builder(context)
-                        .data(Thumbnail(uri, embedded = true, useCachedPreview = prefetch || uri !in album.full))
+                        .data(Thumbnail(uri, embedded = true, useCachedPreview = prefetch || uri !in album.full, indexed = indexed))
                         .size(PREVIEW_EDGE_PX, PREVIEW_EDGE_PX)
                         .scale(Scale.FIT)
                         .memoryCachePolicy(CachePolicy.DISABLED)

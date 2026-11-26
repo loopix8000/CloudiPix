@@ -114,6 +114,12 @@ internal class ThumbnailCache(private val disk: LimitedDiskCache) {
         }
     }
 
+    /** [key]의 미리보기가 [target]을 덮으면 칸 크기로 줄여 돌려준다. 없거나 작으면 새로 만들지 않고 null을 돌려준다. */
+    suspend fun read(key: String?, target: ThumbnailTarget): Bitmap? {
+        if (key == null) return null
+        return withContext(embeddedThumbnailDispatcher) { disk.use { it.read(key, target.stored(), target) } }
+    }
+
     /** 같은 칸의 고화질 요청이 이미 진행 중이면 현재 디스크 캐시를 두 번 디코딩하지 않는다. */
     suspend fun readQuickPreview(key: String?, target: ThumbnailTarget, useCachedPreview: Boolean): Bitmap? {
         if (key == null) return null
@@ -186,14 +192,16 @@ private val LEGACY_DIRECTORIES = listOf("local-thumbnails", "remote-thumbnails")
 // 뷰어용 큰 미리보기가 목록 썸네일을 밀어내지 않도록 한다.
 private const val MAX_STORED_EDGE = 1024
 // 첫 화면의 썸네일들이 미디어 제공자와 디코더를 한꺼번에 점유하지 않도록 한다.
+// 우선순위는 화면 스레드보다 낮게 두되 BACKGROUND(10)보다 한 단계 높인다. 10 이상이면 시스템이 백그라운드
+// 작업 프로필을 적용해 기기에 따라 작은 코어에서만 돌 수 있다.
 private fun thumbnailWorkers(count: Int, name: String) = Executors.newFixedThreadPool(count) { work ->
     Thread({
-        Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+        Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND + Process.THREAD_PRIORITY_MORE_FAVORABLE)
         work.run()
     }, name)
 }.asCoroutineDispatcher()
 
 internal val thumbnailDispatcher = thumbnailWorkers(2, "Gallery thumbnail decode")
-// 내장 썸네일은 작고 금방 끝나므로 원본 디코딩 대기열 뒤에 서지 않도록 따로 처리한다.
+// 내장 썸네일과 디스크 캐시 읽기는 작고 금방 끝나므로 원본 디코딩 대기열 뒤에 서지 않도록 따로 처리한다.
 internal val embeddedThumbnailDispatcher = thumbnailWorkers(2, "Gallery embedded thumbnail")
 private val thumbnailWriter = thumbnailWorkers(1, "Gallery thumbnail write")

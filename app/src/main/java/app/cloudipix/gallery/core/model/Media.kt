@@ -27,6 +27,8 @@ data class Medium(
     override val favoriteOrder: Long? = null,
     val localCopyModified: Long? = null,
     val staleLocalCopyModified: Long? = null,
+    /** 기기 항목의 MediaStore 수정 세대입니다. 모르면 0입니다. */
+    val generation: Long = 0,
 ) : Sortable {
     override val typeRank: Int get() = type.ordinal
     val isRemote: Boolean get() = remoteUri != null

@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MediumEntity::class, FavoriteEntity::class, IgnoredFolderEntity::class,
         PinnedFolderEntity::class, FolderCoverEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class GalleryDatabase : RoomDatabase() {
@@ -52,6 +52,11 @@ abstract class GalleryDatabase : RoomDatabase() {
                 "ALTER TABLE favorites ADD COLUMN added_order INTEGER NOT NULL DEFAULT 0",
                 "UPDATE favorites SET added_order = rowid",
                 "CREATE INDEX IF NOT EXISTS index_favorites_added_order ON favorites(added_order)",
+            ),
+            // 6: 썸네일 캐시 키에 쓰는 MediaStore 수정 세대. 기존 행은 다음 색인 갱신 때 채워집니다.
+            sqlMigration(
+                5, 6,
+                "ALTER TABLE media ADD COLUMN generation INTEGER NOT NULL DEFAULT 0",
             ),
         )
 

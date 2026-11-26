@@ -8,6 +8,8 @@ import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.Size
+import app.cloudipix.gallery.core.model.MediaType
+import app.cloudipix.gallery.core.model.Medium
 import app.cloudipix.gallery.core.remote.REMOTE_MEDIA_SCHEME
 import app.cloudipix.gallery.core.remote.RemoteImages
 import coil3.BitmapImage
@@ -44,11 +46,36 @@ private const val DEFAULT_EDGE_PX = 512
  *
  * [embedded]이면 고화질 썸네일이 준비되기 전에 보여 줄 작은 미리보기를 요청합니다.
  * [useCachedPreview]이면 디스크에 있는 썸네일도 작은 크기로 읽어 격자의 미리보기 버퍼에 쓸 수 있습니다.
+ * [indexed]가 있으면 디스크 캐시 키와 종류를 색인 값으로 정해 미디어 저장소에 다시 묻지 않습니다.
+ * [cachedOnly]이면 디스크에 있는 고화질 썸네일만 읽고, 없으면 새로 만들지 않고 실패합니다.
  */
-data class Thumbnail(val uri: Uri, val embedded: Boolean = false, val useCachedPreview: Boolean = false) {
+data class Thumbnail(
+    val uri: Uri,
+    val embedded: Boolean = false,
+    val useCachedPreview: Boolean = false,
+    val indexed: IndexedMedia? = null,
+    val cachedOnly: Boolean = false,
+) {
     /** 정사각형으로 자르지 않은 전체 구도 미리보기의 메모리 캐시 키입니다. */
     val uncroppedKey: MemoryCache.Key get() = MemoryCache.Key("uncropped-thumbnail:$uri")
 }
+
+/**
+ * 색인에 있는 기기 항목의 수정 버전과 종류입니다. [version]은 `수정 세대:수정 시각(초):크기`로,
+ * [ThumbnailFetcher]가 미디어 저장소에서 읽어 디스크 캐시 키로 쓰는 값과 같은 형식입니다.
+ */
+data class IndexedMedia(val version: String, val video: Boolean)
+
+/**
+ * 화면에 그리는 주소가 색인의 기기 항목이면 그 수정 버전을 돌려줍니다.
+ * 원격 항목과 받아 둔 사본은 색인 값이 그 주소의 파일을 나타내지 않으므로 null입니다.
+ */
+val Medium.indexedMedia: IndexedMedia?
+    get() = if (remoteUri == null && localCopyUri == null && generation > 0) {
+        IndexedMedia("$generation:${dateModified / 1000}:$size", type == MediaType.Video)
+    } else {
+        null
+    }
 
 /**
  * 뷰어를 열 때 먼저 보여 줄 전체 구도 미리보기입니다.
@@ -98,16 +125,28 @@ class ThumbnailFetcher internal constructor(
 
     override suspend fun fetch(): FetchResult {
         if (data.embedded) return sampled(fetchEmbedded())
+        if (data.cachedOnly) return sampled(fetchCached())
         if (data.uri.scheme == REMOTE_MEDIA_SCHEME) {
             return sampled(remoteImages.thumbnail(data.uri, target))
         }
         return withContext(thumbnailDispatcher) { fetchLocal() }
     }
 
+    /** 디스크에 있는 고화질 썸네일만 읽습니다. 금방 끝나므로 원본에서 새로 만드는 작업 뒤에 줄 세우지 않습니다. */
+    private suspend fun fetchCached(): Bitmap {
+        val cached = if (data.uri.scheme == REMOTE_MEDIA_SCHEME) {
+            remoteImages.cachedThumbnail(data.uri, target)
+        } else {
+            withContext(embeddedThumbnailDispatcher) { thumbnails.read(cacheKey(), target) }
+        }
+        return cached ?: throw IOException("디스크에 고화질 썸네일이 없습니다.")
+    }
+
     private suspend fun fetchLocal(): FetchResult {
         val cached = thumbnails.get(cacheKey(), target) { wanted ->
             // 시스템 썸네일은 EXIF에 든 128px 미리보기를 다시 압축한 것일 수 있어 사진은 원본에서 직접 만듭니다.
-            val isImage = context.contentResolver.getType(data.uri)?.startsWith("image/") == true
+            val isImage = data.indexed?.let { !it.video }
+                ?: (context.contentResolver.getType(data.uri)?.startsWith("image/") == true)
             val decoded = if (isImage) decodeFromOriginal(wanted) else null
             decoded ?: loadSystemThumbnail(wanted)
         }
@@ -123,9 +162,13 @@ class ThumbnailFetcher internal constructor(
         if (data.uri.scheme == REMOTE_MEDIA_SCHEME) return remoteImages.embeddedThumbnail(data.uri, target, data.useCachedPreview)
         return withContext(embeddedThumbnailDispatcher) {
             val resolver = context.contentResolver
-            val mimeType = resolver.getType(data.uri)
-            if (mimeType?.startsWith("video/") == true) throw IOException("동영상은 시스템 썸네일을 바로 씁니다.")
+            val indexed = data.indexed
+            // 색인에서 종류를 알면 형식은 파일을 직접 읽어야 할 때만 묻습니다.
+            var mimeType = if (indexed == null) resolver.getType(data.uri) else null
+            val video = indexed?.video ?: (mimeType?.startsWith("video/") == true)
+            if (video) throw IOException("동영상은 시스템 썸네일을 바로 씁니다.")
             thumbnails.readQuickPreview(cacheKey(), target, data.useCachedPreview)?.let { return@withContext it }
+            if (indexed != null) mimeType = resolver.getType(data.uri)
             val embedded = embeddedFormat(mimeType, data.uri.lastPathSegment)?.let { format ->
                 try {
                     resolver.openFileDescriptor(data.uri, "r")?.let { ParcelFileDescriptor.AutoCloseInputStream(it) }?.use { input ->
@@ -152,9 +195,11 @@ class ThumbnailFetcher internal constructor(
 
     /**
      * 디스크 캐시 키입니다. 사진을 편집하거나 회전하면 MediaStore의 수정 세대가 바뀌어 키도 바뀝니다.
+     * 색인에서 버전을 받았으면 그 값을 쓰고, 아니면 미디어 저장소에서 읽습니다.
      * MediaStore가 아닌 제공자는 수정 여부를 알 수 없어 `null`을 돌려 캐시하지 않습니다.
      */
     private fun cacheKey(): String? {
+        data.indexed?.let { return "${data.uri}|${it.version}" }
         val projection = arrayOf(
             MediaStore.MediaColumns.GENERATION_MODIFIED,
             MediaStore.MediaColumns.DATE_MODIFIED,
@@ -208,6 +253,7 @@ class ThumbnailFetcher internal constructor(
 
 /**
  * 썸네일 메모리 캐시 키는 URI 문자열입니다. 뷰어가 같은 키로 캐시된 썸네일을 찾습니다.
+ * 디스크 캐시만 읽는 요청도 같은 키를 써서, 읽어 둔 썸네일을 고화질 요청이 메모리에서 바로 씁니다.
  * 내장 썸네일 요청은 메모리 캐시를 쓰지 않지만, 고화질 썸네일과 섞이지 않도록 키를 따로 둡니다.
  */
 class ThumbnailKeyer : Keyer<Thumbnail> {

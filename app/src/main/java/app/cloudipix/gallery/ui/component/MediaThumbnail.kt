@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import app.cloudipix.gallery.core.media.CoverBlur
+import app.cloudipix.gallery.core.media.IndexedMedia
 import app.cloudipix.gallery.core.media.Thumbnail
 import app.cloudipix.gallery.core.remote.REMOTE_MEDIA_SCHEME
 import app.cloudipix.gallery.ui.theme.GalleryTheme
@@ -42,6 +43,8 @@ import coil3.size.Precision
  *
  * 원격 사진은 같은 사진의 새 버전을 받는 동안이나 받지 못했을 때 마지막으로 보여 준 이미지를
  * 그대로 두어 타일이 비거나 깜박이지 않게 합니다.
+ *
+ * [indexed]는 색인에서 이미 아는 기기 항목의 수정 버전입니다. 주면 불러올 때 미디어 저장소에 다시 묻지 않습니다.
  */
 @Composable
 fun MediaThumbnail(
@@ -56,6 +59,7 @@ fun MediaThumbnail(
     bufferedPreview: ImageBitmap? = null,
     loadFull: Boolean = true,
     onFullFinished: (() -> Unit)? = null,
+    indexed: IndexedMedia? = null,
 ) {
     val context = LocalPlatformContext.current
     val radius = GalleryTheme.corners.radius
@@ -69,9 +73,9 @@ fun MediaThumbnail(
         remember(it, blurred) { mutableStateOf<Image?>(null) }
     }
 
-    val request = remember(context, model, blurred, coverPixels) {
+    val request = remember(context, model, blurred, coverPixels, indexed) {
         model?.let { uri ->
-            val builder = ImageRequest.Builder(context).data(Thumbnail(uri)).precision(Precision.EXACT).crossfade(false)
+            val builder = ImageRequest.Builder(context).data(Thumbnail(uri, indexed = indexed)).precision(Precision.EXACT).crossfade(false)
             coverPixels?.let { builder.size(it, it) }
             if (blurred) builder.transformations(CoverBlur) else builder.placeholderMemoryCacheKey(uri.toString())
             if (lastShown != null) {
@@ -85,11 +89,11 @@ fun MediaThumbnail(
     // 고화질 썸네일이 메모리에 없으면 그동안 내장 썸네일을 아래에 깔아 둡니다. 잠깐 보여 주는 용도라 캐시하지 않습니다.
     // 고화질 썸네일을 보여 주면 내장 썸네일은 내려놓고, 고화질 썸네일을 받지 못하면 계속 보여 줍니다.
     var fullShown by remember(model, blurred, loadFull) { mutableStateOf(false) }
-    val embeddedRequest = remember(context, model, blurred, coverPixels, quickPreview) {
+    val embeddedRequest = remember(context, model, blurred, coverPixels, quickPreview, indexed) {
         model?.takeIf { quickPreview && !blurred && SingletonImageLoader.get(context).memoryCache?.get(MemoryCache.Key(it.toString())) == null }
             ?.let { uri ->
                 val builder = ImageRequest.Builder(context)
-                    .data(Thumbnail(uri, embedded = true))
+                    .data(Thumbnail(uri, embedded = true, indexed = indexed))
                     .memoryCachePolicy(CachePolicy.DISABLED)
                     .crossfade(false)
                 coverPixels?.let { builder.size(it, it) }

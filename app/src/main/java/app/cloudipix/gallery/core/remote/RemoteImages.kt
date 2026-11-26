@@ -57,6 +57,10 @@ class RemoteImages @Inject constructor(
     internal suspend fun thumbnail(uri: Uri, target: ThumbnailTarget): Bitmap =
         thumbnails.get("$uri$PREVIEW_KEY_SUFFIX", target) { createThumbnail(uri, it) } ?: throw IOException()
 
+    /** 디스크에 있는 서버 사진의 썸네일만 [target]에 맞춰 돌려준다. 없거나 작으면 받지 않고 null을 돌려준다. */
+    internal suspend fun cachedThumbnail(uri: Uri, target: ThumbnailTarget): Bitmap? =
+        thumbnails.read("$uri$PREVIEW_KEY_SUFFIX", target)
+
     /**
      * 고화질 썸네일을 받는 동안 먼저 보여 줄 내장 썸네일. 파일에서 썸네일이 있는 부분만 받아 꺼낸다.
      * 앞뒤 페이지를 미리 읽을 때는 디스크에 있는 썸네일도 작은 크기로 재사용한다.

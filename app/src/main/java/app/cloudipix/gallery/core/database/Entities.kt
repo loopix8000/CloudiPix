@@ -15,7 +15,10 @@ import androidx.room.PrimaryKey
  * 이름이 따로 없는 속성은 속성 이름이 곧 열 이름입니다.
  */
 
-/** MediaStore에서 읽은 기기 미디어 색인입니다. [type]은 MediaType 순번입니다. */
+/**
+ * MediaStore에서 읽은 기기 미디어 색인입니다. [type]은 MediaType 순번입니다.
+ * [generation]은 MediaStore의 수정 세대(`GENERATION_MODIFIED`)이며 0이면 아직 읽지 않은 것입니다.
+ */
 @Entity(tableName = "media", indices = [Index("bucket_id"), Index("date_taken")])
 data class MediumEntity(
     @PrimaryKey val id: Long,
@@ -28,6 +31,7 @@ data class MediumEntity(
     val size: Long,
     val type: Int,
     @ColumnInfo(name = "duration_ms") val durationMs: Long,
+    @ColumnInfo(defaultValue = "0") val generation: Long = 0,
 )
 
 /** 갤러리에서 숨긴 폴더입니다. 폴더가 사라져도 목록에 보여 줄 수 있도록 이름을 함께 둡니다. */

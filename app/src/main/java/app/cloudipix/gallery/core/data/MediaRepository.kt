@@ -734,6 +734,7 @@ private fun MediumEntity.toMedium(isFavorite: Boolean, favoriteOrder: Long? = nu
     durationMs = durationMs,
     isFavorite = isFavorite,
     favoriteOrder = favoriteOrder,
+    generation = generation,
 )
 
 /** 저장된 종류 순번을 읽습니다. 알 수 없는 값이면 사진으로 봅니다. */

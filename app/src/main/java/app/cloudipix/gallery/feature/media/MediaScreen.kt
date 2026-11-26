@@ -1,6 +1,7 @@
 package app.cloudipix.gallery.feature.media
 
 import app.cloudipix.gallery.R
+import app.cloudipix.gallery.core.media.indexedMedia
 import app.cloudipix.gallery.core.model.BarAction
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
@@ -451,6 +452,7 @@ internal fun MediaTile(
             bufferedPreview = thumbnails.previews[uri],
             loadFull = uri in thumbnails.full,
             onFullFinished = { thumbnails.finish(uri) },
+            indexed = medium.indexedMedia,
         )
         val knownLength = medium.durationMs > 0
         // 길이를 모르는 동영상(서버 동영상)은 설정과 관계없이 동영상임을 표시합니다.

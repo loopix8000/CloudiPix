@@ -46,6 +46,7 @@ private val COMMON_COLUMNS = arrayOf(
     MediaStore.MediaColumns.DATE_MODIFIED,
     MediaStore.MediaColumns.SIZE,
     MediaStore.MediaColumns.MIME_TYPE,
+    MediaStore.MediaColumns.GENERATION_MODIFIED,
 )
 
 /** MediaStore에서 사진과 동영상 색인을 읽고, 저장소 변경을 알려 줍니다. */
@@ -140,6 +141,7 @@ class MediaStoreScanner @Inject constructor(
         private val modified = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
         private val size = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
         private val mime = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
+        private val generation = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.GENERATION_MODIFIED)
         private val duration = if (withDuration) cursor.getColumnIndex(MediaStore.Video.VideoColumns.DURATION) else -1
 
         fun entity(cursor: Cursor, kind: Kind): MediumEntity {
@@ -162,6 +164,7 @@ class MediaStoreScanner @Inject constructor(
                 size = cursor.getLong(size),
                 type = type.ordinal,
                 durationMs = if (duration >= 0) cursor.getLong(duration) else 0L,
+                generation = cursor.getLong(generation),
             )
         }
     }

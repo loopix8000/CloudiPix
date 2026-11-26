@@ -171,18 +171,22 @@ interface MediaDao {
         val unmatched = HashMap<Long, MediumEntity>(previous.size)
         for (entity in previous) unmatched[entity.id] = entity
 
+        val updated = ArrayList<MediumEntity>()
         val changed = ArrayList<MediumEntity>()
         val relocated = ArrayList<MediumEntity>()
         for (item in items) {
             val before = unmatched.remove(item.id)
             if (before == item) continue
+            updated += item
+            // 수정 세대만 바뀌었으면 파일 위치·크기·수정 시각이 그대로라 동기화할 변경으로 보지 않습니다.
+            if (before != null && before.copy(generation = item.generation) == item) continue
             changed += item
             if (before != null && before.movedTo(item)) relocated += before
         }
 
         val gone = unmatched.values.toList()
         if (gone.isNotEmpty()) deleteAll(gone)
-        if (changed.isNotEmpty()) insertAll(changed)
+        if (updated.isNotEmpty()) insertAll(updated)
         return MediaIndexChanges(removed = relocated + gone, changed = changed)
     }
 }
