@@ -54,6 +54,7 @@
 
     <!-- Search -->
     <string name="search_placeholder">Search by file name</string>
+    <string name="search_in_album_placeholder">Search in %1$s</string>
     <string name="search_no_matches">No matches</string>
     <string name="search_results">%1$s results</string>
 

@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -36,6 +37,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import app.cloudipix.gallery.feature.files.FileAction
 import app.cloudipix.gallery.feature.files.FileActions
+import app.cloudipix.gallery.feature.search.SearchViewModel
+import app.cloudipix.gallery.ui.SearchableHeader
+import app.cloudipix.gallery.ui.searchResultsVisible
 import app.cloudipix.gallery.core.model.Medium
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -98,11 +102,13 @@ import app.cloudipix.gallery.ui.theme.Spacing
 fun FoldersScreen(
     onOpenFolder: (Folder) -> Unit,
     onChooseCover: (Folder) -> Unit,
-    onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTrash: () -> Unit,
     requestLocalAccess: (() -> Unit)? = null,
+    // 검색 결과는 사진 확대 전환을 쓰도록 내비게이션 쪽에서 그립니다. 결과를 놓을 위치로 검색 입력란의 아래쪽 끝을 알립니다.
+    onSearchBarBottom: (Float) -> Unit = {},
     viewModel: FoldersViewModel = hiltViewModel(),
+    search: SearchViewModel = hiltViewModel(),
 ) {
     val access = LocalGalleryAccess.current
     val state = viewModel.state.collectAsStateWithLifecycle().value ?: return
@@ -216,11 +222,18 @@ fun FoldersScreen(
         }, onManageTabs = { manageTabs = true }, onDismiss = { if (!moving) pickTab = false })
     }
     var sortOpen by remember { mutableStateOf(false) }
+    val searching by search.active.collectAsStateWithLifecycle()
+    val showingResults = searchResultsVisible(search)
+    // 탭 이동보다 먼저 검색을 닫습니다.
+    BackHandler(enabled = searching && !state.selecting, onBack = search::close)
+    // 검색 중에 폴더를 길게 눌러 선택을 시작하면 검색을 닫고 선택 제목 줄로 바꿉니다.
+    LaunchedEffect(state.selecting) { if (state.selecting) search.close() }
     VolumeGridScroll(
         grids[currentPage].scroll, height = { grids[currentPage].view?.height ?: 0 },
         backward = grids[currentPage].canScrollBackward, forward = grids[currentPage].canScrollForward,
         enabled = state.settings.volumeButtonPaging && held == null && !sortOpen && !manageTabs &&
-            !(pickTab && state.selecting) && trashItems.isEmpty() && fileActions.enabled && hideActions.enabled,
+            !(pickTab && state.selecting) && trashItems.isEmpty() && fileActions.enabled && hideActions.enabled &&
+            !showingResults,
     )
 
     Column(
@@ -236,46 +249,48 @@ fun FoldersScreen(
                 onSelectAll = { viewModel.selectAll(pageFolders[currentPage]) },
             )
         } else {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 14.dp, end = 12.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FolderTabStrip(
-                    tabs = tabs,
-                    selected = currentPage,
-                    // 탭이 하나뿐이면 누를 곳이 없습니다.
-                    onSelect = { page -> if (tabs.size > 1) scope.launch { pager.animateScrollToPage(page) } },
-                    overlay = false,
-                    modifier = Modifier.weight(1f),
-                )
-                IconAction(GalleryIcons.Search, onClick = onOpenSearch, label = stringResource(R.string.action_search))
-                Box {
-                    OverflowMenu { close ->
-                        MenuEntry(stringResource(R.string.tabs_manage)) { close(); manageTabs = true }
-                        MenuEntry(stringResource(R.string.menu_refresh)) { close(); viewModel.refresh() }
-                        val sortLabel = if (state.settings.manualFolderSort) R.string.folder_sort_manual else state.settings.sorting.key.labelRes
-                        MenuEntry(stringResource(R.string.menu_sort_by), value = stringResource(sortLabel)) { close(); sortOpen = true }
-                        // 보기 필터는 메뉴를 닫지 않고 눌러 가며 바꿉니다.
-                        MenuEntry(stringResource(R.string.menu_show), value = stringResource(state.settings.mediaFilter.labelRes)) {
-                            viewModel.cycleFilter()
-                        }
-                        val hiddenToggle = if (showingHiddenFolders) R.string.menu_hide_ignored_folders else R.string.menu_show_ignored_folders
-                        MenuEntry(stringResource(hiddenToggle)) { close(); viewModel.toggleHiddenFolders() }
-                        MenuEntry(stringResource(R.string.trash_title)) { close(); onOpenTrash() }
-                        requestLocalAccess?.let { request ->
-                            MenuEntry(stringResource(R.string.remote_local_permission)) { close(); request() }
-                        }
-                        MenuEntry(stringResource(R.string.menu_settings)) { close(); onOpenSettings() }
-                    }
-                    GridSortPopup(
-                        open = sortOpen,
-                        onDismiss = { sortOpen = false },
-                        sorting = state.settings.sorting,
-                        onSortKey = viewModel::setSortKey,
-                        onSortDescending = viewModel::setSortDescending,
-                        manualSort = state.settings.manualFolderSort,
-                        onManualSort = viewModel::useManualSort,
+            SearchableHeader(search, bottomPadding = 8.dp, onSearchBarBottom = onSearchBarBottom) { searchAnchor ->
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 14.dp, end = 12.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FolderTabStrip(
+                        tabs = tabs,
+                        selected = currentPage,
+                        // 탭이 하나뿐이면 누를 곳이 없습니다.
+                        onSelect = { page -> if (tabs.size > 1) scope.launch { pager.animateScrollToPage(page) } },
+                        overlay = false,
+                        modifier = Modifier.weight(1f),
                     )
+                    IconAction(GalleryIcons.Search, onClick = search::open, modifier = searchAnchor, label = stringResource(R.string.action_search))
+                    Box {
+                        OverflowMenu { close ->
+                            MenuEntry(stringResource(R.string.tabs_manage)) { close(); manageTabs = true }
+                            MenuEntry(stringResource(R.string.menu_refresh)) { close(); viewModel.refresh() }
+                            val sortLabel = if (state.settings.manualFolderSort) R.string.folder_sort_manual else state.settings.sorting.key.labelRes
+                            MenuEntry(stringResource(R.string.menu_sort_by), value = stringResource(sortLabel)) { close(); sortOpen = true }
+                            // 보기 필터는 메뉴를 닫지 않고 눌러 가며 바꿉니다.
+                            MenuEntry(stringResource(R.string.menu_show), value = stringResource(state.settings.mediaFilter.labelRes)) {
+                                viewModel.cycleFilter()
+                            }
+                            val hiddenToggle = if (showingHiddenFolders) R.string.menu_hide_ignored_folders else R.string.menu_show_ignored_folders
+                            MenuEntry(stringResource(hiddenToggle)) { close(); viewModel.toggleHiddenFolders() }
+                            MenuEntry(stringResource(R.string.trash_title)) { close(); onOpenTrash() }
+                            requestLocalAccess?.let { request ->
+                                MenuEntry(stringResource(R.string.remote_local_permission)) { close(); request() }
+                            }
+                            MenuEntry(stringResource(R.string.menu_settings)) { close(); onOpenSettings() }
+                        }
+                        GridSortPopup(
+                            open = sortOpen,
+                            onDismiss = { sortOpen = false },
+                            sorting = state.settings.sorting,
+                            onSortKey = viewModel::setSortKey,
+                            onSortDescending = viewModel::setSortDescending,
+                            manualSort = state.settings.manualFolderSort,
+                            onManualSort = viewModel::useManualSort,
+                        )
+                    }
                 }
             }
         }

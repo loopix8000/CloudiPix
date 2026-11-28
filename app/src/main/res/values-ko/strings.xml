@@ -52,6 +52,7 @@
 
     <!-- 검색 -->
     <string name="search_placeholder">파일 이름으로 검색</string>
+    <string name="search_in_album_placeholder">%1$s에서 검색</string>
     <string name="search_no_matches">검색 결과 없음</string>
     <string name="search_results">검색 결과 %1$s개</string>
 

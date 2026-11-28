@@ -30,11 +30,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
@@ -179,6 +181,12 @@ class MediaViewModel @Inject constructor(
                 SharingStarted.Lazily,
                 MediaUiState(title = route.title, virtual = virtual, choosingCover = route.chooseCover),
             )
+
+    /** 화면에 보이는 순서의 사진·동영상입니다. 이 앨범 안에서 여는 검색이 이 목록에서 찾습니다. */
+    val shownMedia: Flow<List<Medium>> = state
+        .filter { it.loaded }
+        .map { current -> current.items.mapNotNull { (it as? GridItem.Item)?.medium } }
+        .distinctUntilChanged()
 
     private fun queryFor(config: GallerySettings) = albumQuery(config, bucketId, route.chooseCover)
 

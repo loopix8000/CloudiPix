@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -72,6 +73,10 @@ import app.cloudipix.gallery.core.settings.sortingFor
 import app.cloudipix.gallery.feature.files.FileAction
 import app.cloudipix.gallery.feature.files.FileActions
 import app.cloudipix.gallery.feature.folders.rememberFolderHideActions
+import app.cloudipix.gallery.feature.search.SearchViewModel
+import app.cloudipix.gallery.ui.SearchResults
+import app.cloudipix.gallery.ui.SearchableHeader
+import app.cloudipix.gallery.ui.searchResultsVisible
 import app.cloudipix.gallery.ui.component.GalleryIcons
 import app.cloudipix.gallery.ui.component.ActionBar
 import app.cloudipix.gallery.ui.component.IconAction
@@ -99,13 +104,13 @@ import kotlinx.coroutines.launch
 fun MediaScreen(
     onBack: () -> Unit,
     onOpenMedium: (Medium) -> Unit,
-    onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSync: () -> Unit,
     initialSettings: GallerySettings,
     photoTransition: @Composable (Long) -> Modifier = { Modifier },
     gridModifier: Modifier = Modifier,
     viewModel: MediaViewModel = hiltViewModel(),
+    search: SearchViewModel = hiltViewModel(),
 ) {
     val library by viewModel.state.collectAsStateWithLifecycle()
     val pending by viewModel.pendingRemovals.collectAsStateWithLifecycle()
@@ -129,6 +134,13 @@ fun MediaScreen(
     val hideActions = rememberFolderHideActions(viewModel::folderHideOptions, viewModel::hideFolders, onBack)
 
     BackHandler(enabled = state.selecting, onBack = viewModel::clearSelection)
+    // 앨범 안에서 연 검색은 이 앨범에 보이는 항목에서만 찾습니다. 결과를 구독하기 전에 범위를 정합니다.
+    remember(search, viewModel) { search.searchWithin(viewModel.shownMedia) }
+    val searching by search.active.collectAsStateWithLifecycle()
+    val showingResults = searchResultsVisible(search)
+    BackHandler(enabled = searching && !state.selecting, onBack = search::close)
+    // 검색 중에 사진을 길게 눌러 선택을 시작하면 검색을 닫고 선택 제목 줄로 바꿉니다.
+    LaunchedEffect(state.selecting) { if (state.selecting) search.close() }
 
     val gridState = rememberLazyGridState()
     val thumbnails = rememberAlbumThumbnails(gridState, items, if (state.choosingCover && state.loaded) 1 else 0)
@@ -140,7 +152,10 @@ fun MediaScreen(
     var groupMenuOpen by remember { mutableStateOf(false) }
     val rangeDrag = rememberGridRangeDrag(gridState, gapPx) { _, to -> viewModel.selectRange(to) }
     val popupOpen = fileAction != null || sortMenuOpen || groupMenuOpen
-    VolumeGridScroll(gridState, enabled = settings.volumeButtonPaging && !popupOpen && !rangeDrag.active && hideActions.enabled)
+    VolumeGridScroll(
+        gridState,
+        enabled = settings.volumeButtonPaging && !popupOpen && !rangeDrag.active && hideActions.enabled && !showingResults,
+    )
 
     val onItemTap: (Medium) -> Unit = { medium ->
         when {
@@ -171,53 +186,70 @@ fun MediaScreen(
         when {
             state.selecting -> SelectionHeader(state.selected.size, onClose = viewModel::clearSelection, onSelectAll = viewModel::selectAll)
             state.choosingCover -> AlbumHeader(stringResource(R.string.album_choose_cover), state.title, onBack)
-            else -> AlbumHeader(
-                title = state.title,
-                subtitle = stringResource(R.string.media_summary, formatCount(state.totalCount), formatSize(state.totalSize)),
-                onBack = onBack,
-            ) {
-                IconAction(GalleryIcons.Search, onClick = onOpenSearch, label = stringResource(R.string.action_search))
-                Box {
-                    OverflowMenu { close ->
-                        MenuEntry(stringResource(R.string.menu_refresh)) { close(); viewModel.refresh() }
-                        if (showSyncMenu) MenuEntry(stringResource(R.string.sync_menu)) { close(); onOpenSync() }
-                        // 즐겨찾기 추가순으로 볼 때는 날짜로 묶지 않으므로 묶기 메뉴를 숨깁니다.
-                        if (sorting.key != SortKey.FavoriteAdded) {
-                            MenuEntry(stringResource(R.string.menu_group_by), value = stringResource(grouping.labelRes)) {
-                                close(); groupMenuOpen = true
+            else -> SearchableHeader(
+                search,
+                bottomPadding = 14.dp,
+                placeholder = stringResource(R.string.search_in_album_placeholder, state.title),
+            ) { searchAnchor ->
+                AlbumHeader(
+                    title = state.title,
+                    subtitle = stringResource(R.string.media_summary, formatCount(state.totalCount), formatSize(state.totalSize)),
+                    onBack = onBack,
+                ) {
+                    IconAction(GalleryIcons.Search, onClick = search::open, modifier = searchAnchor, label = stringResource(R.string.action_search))
+                    Box {
+                        OverflowMenu { close ->
+                            MenuEntry(stringResource(R.string.menu_refresh)) { close(); viewModel.refresh() }
+                            if (showSyncMenu) MenuEntry(stringResource(R.string.sync_menu)) { close(); onOpenSync() }
+                            // 즐겨찾기 추가순으로 볼 때는 날짜로 묶지 않으므로 묶기 메뉴를 숨깁니다.
+                            if (sorting.key != SortKey.FavoriteAdded) {
+                                MenuEntry(stringResource(R.string.menu_group_by), value = stringResource(grouping.labelRes)) {
+                                    close(); groupMenuOpen = true
+                                }
                             }
+                            MenuEntry(stringResource(R.string.menu_sort_by), value = stringResource(sorting.key.labelRes)) {
+                                close(); sortMenuOpen = true
+                            }
+                            if (!state.virtual && hideActions.enabled) {
+                                MenuEntry(stringResource(R.string.menu_ignore_folder)) { close(); hideActions.hide(viewModel.hideTarget) }
+                            }
+                            MenuEntry(stringResource(R.string.menu_settings)) { close(); onOpenSettings() }
                         }
-                        MenuEntry(stringResource(R.string.menu_sort_by), value = stringResource(sorting.key.labelRes)) {
-                            close(); sortMenuOpen = true
-                        }
-                        if (!state.virtual && hideActions.enabled) {
-                            MenuEntry(stringResource(R.string.menu_ignore_folder)) { close(); hideActions.hide(viewModel.hideTarget) }
-                        }
-                        MenuEntry(stringResource(R.string.menu_settings)) { close(); onOpenSettings() }
+                        GridSortPopup(
+                            open = sortMenuOpen,
+                            onDismiss = { sortMenuOpen = false },
+                            sorting = sorting,
+                            onSortKey = viewModel::setSortKey,
+                            onSortDescending = viewModel::setSortDescending,
+                            folderOnly = folderPrefs?.sortingFolderOnly != false,
+                            onFolderOnlyChange = viewModel::setSortingFolderOnly,
+                            allowFavoriteSort = viewModel.isFavorites,
+                        )
+                        GridGroupPopup(
+                            open = groupMenuOpen,
+                            onDismiss = { groupMenuOpen = false },
+                            grouping = grouping,
+                            onGrouping = viewModel::setGrouping,
+                            folderOnly = folderPrefs?.groupingFolderOnly != false,
+                            onFolderOnlyChange = viewModel::setGroupingFolderOnly,
+                        )
                     }
-                    GridSortPopup(
-                        open = sortMenuOpen,
-                        onDismiss = { sortMenuOpen = false },
-                        sorting = sorting,
-                        onSortKey = viewModel::setSortKey,
-                        onSortDescending = viewModel::setSortDescending,
-                        folderOnly = folderPrefs?.sortingFolderOnly != false,
-                        onFolderOnlyChange = viewModel::setSortingFolderOnly,
-                        allowFavoriteSort = viewModel.isFavorites,
-                    )
-                    GridGroupPopup(
-                        open = groupMenuOpen,
-                        onDismiss = { groupMenuOpen = false },
-                        grouping = grouping,
-                        onGrouping = viewModel::setGrouping,
-                        folderOnly = folderPrefs?.groupingFolderOnly != false,
-                        onFolderOnlyChange = viewModel::setGroupingFolderOnly,
-                    )
                 }
             }
         }
 
-        PullToRefresh(
+        // 검색어를 입력하기 전까지는 앨범 격자를 그대로 보여 줍니다. 스크롤 위치는 위에서 들고 있어 검색을 닫으면 제자리로 돌아옵니다.
+        if (showingResults) {
+            SearchResults(
+                search = search,
+                settings = settings,
+                // 결과는 모두 이 앨범의 항목이므로 앨범에서 열 때와 같이 열어 뷰어에서 앨범 순서대로 넘깁니다.
+                onOpenMedium = onOpenMedium,
+                modifier = Modifier.weight(1f),
+                photoTransition = photoTransition,
+                gridModifier = gridModifier,
+            )
+        } else PullToRefresh(
             refreshing = state.refreshing,
             onRefresh = viewModel::refresh,
             atTop = { !gridState.canScrollBackward },

@@ -46,6 +46,7 @@
 
     <!-- Пошук -->
     <string name="search_placeholder">Пошук за назвою файлу</string>
+    <string name="search_in_album_placeholder">Пошук у «%1$s»</string>
     <string name="search_no_matches">Нічого не знайдено</string>
     <string name="search_results">Знайдено: %1$s</string>
 

@@ -52,6 +52,7 @@
     <!-- Media grid and search -->
     <string name="media_summary">%1$s 件 · %2$s</string>
     <string name="search_placeholder">ファイル名で検索</string>
+    <string name="search_in_album_placeholder">%1$s 内を検索</string>
     <string name="search_no_matches">一致する項目がありません</string>
     <string name="search_results">%1$s 件の検索結果</string>
 

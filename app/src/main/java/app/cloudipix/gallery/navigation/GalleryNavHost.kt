@@ -19,8 +19,15 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
@@ -29,6 +36,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -46,8 +54,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
@@ -90,8 +101,10 @@ import app.cloudipix.gallery.ui.theme.GallerySystemBarAppearance
 import app.cloudipix.gallery.ui.theme.GalleryTheme
 import app.cloudipix.gallery.ui.theme.ThemeMode
 import app.cloudipix.gallery.ui.AboutPage
-import app.cloudipix.gallery.ui.SearchPage
+import app.cloudipix.gallery.ui.SearchResults
 import app.cloudipix.gallery.ui.TrashPage
+import app.cloudipix.gallery.ui.searchResultsVisible
+import app.cloudipix.gallery.feature.search.SearchViewModel
 import coil3.BitmapImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -128,9 +141,6 @@ object CloudSyncSettings
 
 @Serializable
 object CloudSyncHistory
-
-@Serializable
-object Search
 
 @Serializable
 object IgnoredFolders
@@ -205,7 +215,8 @@ fun GalleryNavHost(
     val currentEntry by navController.currentBackStackEntryAsState()
     val settingsMode = settings.settingsTheme.mode
     val openSettings = { navController.navigate(Settings) }
-    val openSearch = { navController.navigate(Search) }
+    // 폴더 화면 검색 입력란의 아래쪽 끝(창 기준)입니다. 검색 결과를 이 아래에 겹쳐 그립니다.
+    val folderSearchBottom = remember { mutableFloatStateOf(0f) }
     val back: () -> Unit = { if (navController.previousBackStackEntry == null) onExit() else navController.popBackStack() }
     var sharedPhotoId by rememberSaveable { mutableStateOf<Long?>(null) }
     val closingPhoto = remember { mutableStateOf<ClosingPhoto?>(null) }
@@ -251,7 +262,7 @@ fun GalleryNavHost(
     }
     val visibleEntries by navController.visibleEntries.collectAsState()
     val folderState = rememberSaveableStateHolder()
-    // 폴더 화면과 설정 화면이 함께 전환 중일 때만 폴더 화면을 밀어낸다. 검색·휴지통 전환에는 영향을 주지 않는다.
+    // 폴더 화면과 설정 화면이 함께 전환 중일 때만 폴더 화면을 밀어낸다. 사진 보기·휴지통 전환에는 영향을 주지 않는다.
     val settingsInMotion = rememberUpdatedState(visibleEntries.any { it.destination.isSettingsDestination() })
     val folderRecede = remember { mutableStateOf<State<Float>?>(null) }
     val layoutDirection = LocalLayoutDirection.current
@@ -265,10 +276,10 @@ fun GalleryNavHost(
                     FoldersScreen(
                         onOpenFolder = { openAlbum(Media(it.bucketId, it.name)) },
                         onChooseCover = { openAlbum(Media(it.bucketId, it.name, chooseCover = true)) },
-                        onOpenSearch = { openSearch() },
                         onOpenSettings = { openSettings() },
                         onOpenTrash = { navController.navigate(Trash) },
                         requestLocalAccess = requestLocalAccess,
+                        onSearchBarBottom = { folderSearchBottom.floatValue = it },
                     )
                 }
             }
@@ -280,7 +291,7 @@ fun GalleryNavHost(
                 // 설정이 닫힐 때도 끝까지 밀려 나가도록 빈 화면을 전체 크기로 둔다.
                 composable<Folders> {
                     // 폴더 화면의 밀림 정도를 이 항목의 전환에 묶어 설정 화면의 슬라이드와 같은 프레임에 움직인다.
-                    // 설정과 무관한 전환은 즉시 끝내 검색·휴지통 화면이 열리는 시간을 늘리지 않는다.
+                    // 설정과 무관한 전환은 즉시 끝내 사진 보기·휴지통 화면이 열리는 시간을 늘리지 않는다.
                     val recede = transition.animateFloat(
                         transitionSpec = {
                             // 열 때는 이미 바뀐 현재 항목으로, 돌아올 때는 아직 보이는 설정 항목으로 판단한다.
@@ -295,7 +306,28 @@ fun GalleryNavHost(
                         folderRecede.value = recede
                         onDispose { if (folderRecede.value === recede) folderRecede.value = null }
                     }
-                    Box(Modifier.fillMaxSize())
+                    val visibility = this
+                    // 폴더 화면과 같은 항목의 검색 상태를 씁니다.
+                    val search: SearchViewModel = hiltViewModel()
+                    Box(Modifier.fillMaxSize()) {
+                        // 폴더 화면은 이 장면 밖에서 그리므로, 사진 확대 전환이 필요한 검색 결과만 여기서 폴더 화면 위에 겹칩니다.
+                        if (searchResultsVisible(search)) {
+                            FolderSearchResults(top = { folderSearchBottom.floatValue }) { modifier ->
+                                SearchResults(
+                                    search = search,
+                                    settings = currentSettings,
+                                    onOpenMedium = { openViewer(it.bucketId, it) },
+                                    modifier = modifier,
+                                    photoTransition = { id ->
+                                        if (id == sharedPhotoId) {
+                                            sharedScene.sharedPhoto(id, visibility, inGrid = true, closingPhoto = closingPhoto) { gridBounds.value }
+                                        } else Modifier
+                                    },
+                                    gridModifier = gridModifier,
+                                )
+                            }
+                        }
+                    }
                 }
                 composable<Media> { entry ->
                     val visibility = this
@@ -304,7 +336,6 @@ fun GalleryNavHost(
                         MediaScreen(
                             onBack = back,
                             onOpenMedium = { openViewer(bucketId, it) },
-                            onOpenSearch = { openSearch() },
                             onOpenSettings = { openSettings() },
                             onOpenSync = { navController.navigate(FolderSyncOptions(albumId = bucketId)) },
                             photoTransition = { id ->
@@ -363,19 +394,6 @@ fun GalleryNavHost(
                 composable<Editor> { entry ->
                     val bucketId = entry.toRoute<Editor>().bucketId.takeUnless { it == RECENT_BUCKET_ID }
                     FolderAccessGate(bucketId, onBack = back) { PhotoEditorScreen(onBack = back) }
-                }
-                composable<Search> {
-                    val visibility = this
-                    SearchPage(
-                        onBack = navController::popBackStack,
-                        onOpenMedium = { openViewer(it.bucketId, it) },
-                        photoTransition = { id ->
-                            if (id == sharedPhotoId) {
-                                sharedScene.sharedPhoto(id, visibility, inGrid = true, closingPhoto = closingPhoto) { gridBounds.value }
-                            } else Modifier
-                        },
-                        gridModifier = gridModifier,
-                    )
                 }
                 settingsComposable<Settings>(settingsState) {
                     SettingsScreen(
@@ -476,6 +494,26 @@ fun GalleryNavHost(
     }
 }
 
+/**
+ * 폴더 화면의 검색 입력란 아래를 덮는 검색 결과 자리입니다. [top]은 입력란 아래쪽 끝의 창 기준 위치입니다.
+ * 결과 아래의 폴더 격자가 눌리지 않도록 터치를 여기서 막습니다.
+ */
+@Composable
+private fun FolderSearchResults(top: () -> Float, content: @Composable (Modifier) -> Unit) {
+    var origin by remember { mutableFloatStateOf(0f) }
+    val offset = with(LocalDensity.current) { (top() - origin).coerceAtLeast(0f).toDp() }
+    Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow().y }) {
+        content(
+            Modifier
+                .padding(top = offset)
+                .fillMaxSize()
+                .background(GalleryTheme.colors.galleryListBackground)
+                .pointerInput(Unit) {}
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)),
+        )
+    }
+}
+
 private inline fun <reified T : Any> NavGraphBuilder.settingsComposable(
     settings: State<GallerySettings>,
     crossinline content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit,
@@ -544,7 +582,8 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.isPhotoTransition(
     else -> false
 }
 
-private fun NavBackStackEntry.isPhotoGrid(): Boolean = destination.hasRoute<Media>() || destination.hasRoute<Search>()
+// 폴더 화면에서는 검색 결과에서만 사진을 엽니다.
+private fun NavBackStackEntry.isPhotoGrid(): Boolean = destination.hasRoute<Media>() || destination.hasRoute<Folders>()
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable

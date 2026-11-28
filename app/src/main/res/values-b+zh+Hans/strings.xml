@@ -52,6 +52,7 @@
     <!-- Media grid and search -->
     <string name="media_summary">%1$s 项 · %2$s</string>
     <string name="search_placeholder">按文件名搜索</string>
+    <string name="search_in_album_placeholder">在 %1$s 中搜索</string>
     <string name="search_no_matches">没有匹配结果</string>
     <string name="search_results">%1$s 条结果</string>
 
