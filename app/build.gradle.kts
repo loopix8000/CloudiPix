@@ -35,6 +35,13 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            manifestPlaceholders["launcherLabel"] = "@string/app_name"
+        }
+        // 실제로 쓰는 앱과 데이터가 섞이지 않도록 다른 앱 ID로 따로 설치하고, 런처에서 구분되도록 앱 이름을 보여 준다.
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["launcherLabel"] = "@string/cloudipix_name"
         }
         // 개발 기기의 데이터를 유지하면서 실제 배포와 같은 R8 최적화로 스크롤 성능을 측정한다.
         create("benchmark") {
